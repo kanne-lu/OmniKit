@@ -53,19 +53,20 @@ h1, h2, p { margin: 0; }
 .home-heading h1, .tool-titlebar h1 { font-size: 36px; line-height: 1.12; letter-spacing: -1.3px; }
 .home-heading p, .tool-titlebar p { margin-top: 12px; color: #949ea4; font-size: 16px; }
 .home-layout { display: grid; grid-template-columns: minmax(0, 1fr) 298px; gap: 36px; }
-.tool-list { display: grid; gap: 12px; }
-.tool-row { display: flex; min-height: 104px; align-items: stretch; border: 1px solid #2e373b; border-radius: 13px; background: linear-gradient(110deg, #12191d, #10161a); overflow: hidden; transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease; }
+.tool-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.tool-row { display: flex; min-height: 164px; align-items: stretch; border: 1px solid #2e373b; border-radius: 13px; background: linear-gradient(110deg, #12191d, #10161a); overflow: hidden; transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease; }
+.tool-row:nth-child(5) { grid-column: 1 / -1; }
 .tool-row:hover { border-color: #556267; transform: translateY(-1px); box-shadow: 0 10px 30px rgb(0 0 0 / 17%); }
 .tool-row-main { display: flex; min-width: 0; flex: 1; align-items: center; gap: 24px; border: 0; background: transparent; padding: 17px 20px; text-align: left; cursor: pointer; }
 .tool-icon, .recent-icon { display: grid; flex: 0 0 auto; place-items: center; border: 1px solid #485257; border-radius: 12px; background: #11181b; color: #ccfa58; box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%); }
 .tool-icon { width: 64px; height: 64px; }
 .tool-copy { display: grid; min-width: 0; gap: 7px; }
 .tool-copy strong { color: #f1f4ef; font-size: 21px; letter-spacing: -.3px; }
-.tool-copy small { overflow: hidden; color: #a7b0b3; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.tool-copy small { color: #a7b0b3; font-size: 15px; line-height: 1.42; }
 .tool-chevron { margin-left: auto; color: #afb8bb; }
 .favorite-button { display: grid; width: 48px; place-items: center; align-self: flex-start; border: 0; background: transparent; color: #788287; cursor: pointer; }
 .favorite-button:hover, .favorite-button.is-favorite { color: #d9ff68; }
-.privacy-note { display: flex; align-items: center; gap: 10px; margin: 22px 2px; color: #60aefc; font-size: 16px; }
+.privacy-note { display: flex; grid-column: 1 / -1; align-items: center; gap: 10px; margin: 6px 2px 22px; color: #60aefc; font-size: 16px; }
 .recent-rail { min-height: 560px; border-left: 1px solid #2b3337; padding-left: 28px; }
 .rail-heading { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #293236; padding: 0 0 17px; color: #f2f5f0; }
 .rail-heading h2 { font-size: 22px; letter-spacing: -.5px; }
@@ -174,6 +175,9 @@ h1, h2, p { margin: 0; }
   .tool-copy strong { font-size: 17px; }
   .tool-copy small { white-space: normal; }
   .editor-grid, .text-tool-grid, .image-layout { grid-template-columns: 1fr; min-height: auto; }
+  .tool-list { grid-template-columns: 1fr; gap: 12px; }
+  .tool-row { min-height: 104px; }
+  .tool-row:nth-child(5) { grid-column: auto; }
   .editor-grid, .text-tool-grid { gap: 12px; }
   .editor-pane { min-height: 320px; }
   .rename-form { grid-template-columns: 1fr; }
