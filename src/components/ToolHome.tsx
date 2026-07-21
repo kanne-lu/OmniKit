@@ -17,7 +17,6 @@ export function ToolHome({ tools, recent, favorites, onOpenTool, onToggleFavorit
       <div className="home-heading">
         <div>
           <h1>开始处理</h1>
-          <p>从一个工具开始，所有内容仅在你的电脑上处理。</p>
         </div>
       </div>
 
