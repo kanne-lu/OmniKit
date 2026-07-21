@@ -244,6 +244,15 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
 .about-card dd { margin: 5px 0 0; color: #315a79; font-size: 13px; font-weight: 500; }
 .about-note { display: flex; align-items: flex-start; gap: 7px; border-top: 1px solid #e2ebf1; padding-top: 15px; color: #587890; font-size: 13px; line-height: 1.55; }
 .about-note svg { flex: 0 0 auto; margin-top: 1px; color: var(--success); }
+.about-update { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 18px; border-top: 1px solid #e2ebf1; padding-top: 17px; }
+.about-update-copy { min-width: 0; }
+.about-update-copy strong { display: block; margin-top: 4px; color: #36566e; font-size: 14px; font-weight: 700; }
+.about-update-copy p, .update-notes { display: block; max-width: 470px; margin-top: 4px; color: #718899; font-size: 12px; line-height: 1.55; }
+.update-notes { color: #587890; white-space: pre-line; }
+.about-update-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; }
+.about-update .primary-button, .about-update .secondary-button { white-space: nowrap; }
+.about-update.is-success .about-update-copy strong, .about-update.is-success .update-result-icon { color: var(--success); }
+.about-update.is-error .about-update-copy strong, .about-update.is-error .update-result-icon { color: var(--danger); }
 .about-aside { border-left: 1px solid var(--line); padding: 5px 0 5px 19px; animation: about-reveal .42s .12s cubic-bezier(.2, .72, .24, 1) both; }
 .about-principles { display: grid; gap: 12px; margin: 18px 0 0; padding: 0; list-style: none; }
 .about-principles li { position: relative; display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 8px; margin-left: -8px; padding: 8px; transition: background .2s ease, box-shadow .2s ease, transform .2s ease; }
@@ -310,6 +319,8 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
   .switch-row, .data-actions { grid-column: 1 / -1; }
   .about-layout { grid-template-columns: 1fr; gap: 20px; }
   .about-card { padding: 19px; }
+  .about-update { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .about-update-actions { width: 100%; justify-content: space-between; }
   .about-aside { border-top: 1px solid var(--line); border-left: 0; padding: 15px 0 0; }
   .about-principles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
 }
