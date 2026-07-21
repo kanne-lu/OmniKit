@@ -50,10 +50,10 @@ export default function App() {
   const setCategory = (category: Category | 'all') => { setActiveCategory(category); setActiveToolId(null); setActiveView('home'); };
   const toggleFavorite = (id: ToolId) => setFavorites((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   const screenCopy = activeView === 'recent'
-    ? { title: '继续上次的工作', description: '最近打开过的工具会按时间排列在这里。', emptyMessage: '最近使用还是空的' }
+    ? { title: '最近使用', description: '按最近打开的顺序查看工具。', emptyMessage: '还没有最近使用的工具。' }
     : activeView === 'favorites'
-      ? { title: '你收藏的工具', description: '把常用工具固定在这里，下一次可以直接进入。', emptyMessage: '还没有收藏工具' }
-      : { title: '从一个小任务开始', description: '不上传、不等待。选择一个工具，马上在本机完成处理。', emptyMessage: '没有找到匹配的工具' };
+      ? { title: '收藏', description: '将常用工具固定在这里，方便下次继续处理。', emptyMessage: '还没有收藏工具。' }
+      : { title: '工作台', description: '选择一个工具，在本机完成处理。', emptyMessage: '没有找到匹配的工具。' };
 
   return (
     <main className={reducedMotion ? 'app-shell reduced-motion' : 'app-shell'}>
