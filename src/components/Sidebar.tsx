@@ -10,10 +10,13 @@ import {
 } from 'lucide-react';
 import { CATEGORIES, type Category } from '../lib/registry';
 
+export type AppView = 'home' | 'recent' | 'favorites' | 'settings' | 'about';
+
 interface SidebarProps {
+  activeView: AppView;
   activeCategory: Category | 'all';
   onCategoryChange: (category: Category | 'all') => void;
-  onHome: () => void;
+  onNavigate: (view: AppView) => void;
 }
 
 const categoryIcons = {
@@ -23,20 +26,22 @@ const categoryIcons = {
   '开发工具': Code2,
 } satisfies Record<Category, typeof Code2>;
 
-export function Sidebar({ activeCategory, onCategoryChange, onHome }: SidebarProps) {
+export function Sidebar({ activeView, activeCategory, onCategoryChange, onNavigate }: SidebarProps) {
+  const isHomeActive = activeView === 'home' && activeCategory === 'all';
+
   return (
     <aside className="sidebar">
-      <button className="brand" type="button" onClick={onHome} aria-label="返回 OmniKit 工作台">
+      <button className="brand" type="button" onClick={() => onNavigate('home')} aria-label="返回 OmniKit 工作台">
         <span className="brand-mark" aria-hidden="true"><span /></span>
         <span>OmniKit</span>
       </button>
 
       <nav className="sidebar-primary" aria-label="主导航">
-        <button className={activeCategory === 'all' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onCategoryChange('all')}>
+        <button className={isHomeActive ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onCategoryChange('all')}>
           <Grid2X2 size={20} /> <span>工作台</span>
         </button>
-        <button className="nav-row" type="button" onClick={onHome}><Clock3 size={20} /> <span>最近使用</span></button>
-        <button className="nav-row" type="button" onClick={onHome}><Star size={20} /> <span>收藏</span></button>
+        <button className={activeView === 'recent' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('recent')}><Clock3 size={20} /> <span>最近使用</span></button>
+        <button className={activeView === 'favorites' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('favorites')}><Star size={20} /> <span>收藏</span></button>
       </nav>
 
       <div className="sidebar-divider" />
@@ -57,8 +62,8 @@ export function Sidebar({ activeCategory, onCategoryChange, onHome }: SidebarPro
       </nav>
 
       <div className="sidebar-footer">
-        <button className="nav-row" type="button"><Settings2 size={20} /> <span>设置</span></button>
-        <button className="nav-row" type="button"><Info size={20} /> <span>关于</span></button>
+        <button className={activeView === 'settings' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('settings')}><Settings2 size={20} /> <span>设置</span></button>
+        <button className={activeView === 'about' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('about')}><Info size={20} /> <span>关于</span></button>
         <div className="local-note"><span className="local-dot" /> 本机模式</div>
       </div>
     </aside>
