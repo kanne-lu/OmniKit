@@ -1,6 +1,6 @@
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
-use image::{ImageFormat, ImageReader};
+use image::{ImageFormat, ImageReader, RgbaImage};
 use md5::{Digest as Md5Digest, Md5};
 use serde::Serialize;
 use sha1::Sha1;
@@ -8,6 +8,7 @@ use sha2::Sha256;
 use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,6 +35,12 @@ struct ImageResult {
     bytes: u64,
     width: u32,
     height: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OcrResult {
+    text: String,
 }
 
 fn hash_file_contents(path: &Path) -> Result<HashResult, String> {
@@ -113,6 +120,104 @@ fn build_rename_plan(
             (path, next_name, conflict)
         })
         .collect())
+}
+
+fn expected_rgba_bytes(width: u32, height: u32) -> Result<usize, String> {
+    if width == 0 || height == 0 {
+        return Err("截图尺寸无效，请重新截图后再试".to_owned());
+    }
+
+    let bytes = u64::from(width)
+        .checked_mul(u64::from(height))
+        .and_then(|pixels| pixels.checked_mul(4))
+        .ok_or_else(|| "截图尺寸过大，无法识别".to_owned())?;
+    usize::try_from(bytes).map_err(|_| "截图尺寸过大，无法识别".to_owned())
+}
+
+#[cfg(target_os = "windows")]
+fn create_ocr_engine() -> Result<windows::Media::Ocr::OcrEngine, String> {
+    use windows::core::HSTRING;
+    use windows::Globalization::Language;
+    use windows::Media::Ocr::OcrEngine;
+
+    for language_tag in ["zh-Hans", "en-US"] {
+        let language = Language::CreateLanguage(&HSTRING::from(language_tag))
+            .map_err(|error| format!("无法初始化 Windows OCR 语言：{error}"))?;
+        if OcrEngine::IsLanguageSupported(&language).unwrap_or(false) {
+            if let Ok(engine) = OcrEngine::TryCreateFromLanguage(&language) {
+                return Ok(engine);
+            }
+        }
+    }
+
+    OcrEngine::TryCreateFromUserProfileLanguages().map_err(|_| {
+        "Windows 未提供可用的 OCR 语言。请在“设置 > 时间和语言 > 语言和区域”中安装中文或英文的 OCR 功能后重试。".to_owned()
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn recognize_windows_image(path: &Path) -> Result<String, String> {
+    use windows::core::HSTRING;
+    use windows::Graphics::Imaging::BitmapDecoder;
+    use windows::Storage::{FileAccessMode, StorageFile};
+
+    let path = path
+        .canonicalize()
+        .map_err(|error| format!("无法读取图片：{error}"))?;
+    if !path.is_file() {
+        return Err("请选择一张本地图片".to_owned());
+    }
+
+    let path_string = HSTRING::from(path.to_string_lossy().to_string());
+    let file = StorageFile::GetFileFromPathAsync(&path_string)
+        .map_err(|error| format!("无法打开图片：{error}"))?
+        .get()
+        .map_err(|error| format!("无法打开图片：{error}"))?;
+    let stream = file
+        .OpenAsync(FileAccessMode::Read)
+        .map_err(|error| format!("无法读取图片：{error}"))?
+        .get()
+        .map_err(|error| format!("无法读取图片：{error}"))?;
+    let decoder = BitmapDecoder::CreateAsync(&stream)
+        .map_err(|error| format!("无法解码图片：{error}"))?
+        .get()
+        .map_err(|error| format!("无法解码图片：{error}"))?;
+    let bitmap = decoder
+        .GetSoftwareBitmapAsync()
+        .map_err(|error| format!("无法读取图片像素：{error}"))?
+        .get()
+        .map_err(|error| format!("无法读取图片像素：{error}"))?;
+    let engine = create_ocr_engine()?;
+    let result = engine
+        .RecognizeAsync(&bitmap)
+        .map_err(|error| format!("无法开始文字识别：{error}"))?
+        .get()
+        .map_err(|error| format!("文字识别失败：{error}"))?;
+    let text = result
+        .Text()
+        .map_err(|error| format!("无法读取识别结果：{error}"))?
+        .to_string();
+
+    if text.trim().is_empty() {
+        return Err("没有识别到可复制的文字，请换一张更清晰的图片".to_owned());
+    }
+    Ok(text)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn recognize_windows_image(_: &Path) -> Result<String, String> {
+    Err("截图 OCR 当前仅支持 Windows 桌面版".to_owned())
+}
+
+fn temporary_ocr_image_path() -> PathBuf {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "omnikit-ocr-{}-{timestamp}.png",
+        std::process::id()
+    ))
 }
 
 #[tauri::command]
@@ -228,6 +333,29 @@ fn convert_image(
 }
 
 #[tauri::command]
+fn recognize_image_file(path: String) -> Result<OcrResult, String> {
+    recognize_windows_image(Path::new(&path)).map(|text| OcrResult { text })
+}
+
+#[tauri::command]
+fn recognize_clipboard_image(width: u32, height: u32, bytes: Vec<u8>) -> Result<OcrResult, String> {
+    let expected_bytes = expected_rgba_bytes(width, height)?;
+    if bytes.len() != expected_bytes {
+        return Err("截图数据不完整，请重新截图后再试".to_owned());
+    }
+
+    let image = RgbaImage::from_raw(width, height, bytes)
+        .ok_or_else(|| "无法读取截图数据，请重新截图后再试".to_owned())?;
+    let path = temporary_ocr_image_path();
+    image
+        .save_with_format(&path, ImageFormat::Png)
+        .map_err(|error| format!("无法准备截图：{error}"))?;
+    let result = recognize_windows_image(&path);
+    let _ = fs::remove_file(&path);
+    result.map(|text| OcrResult { text })
+}
+
+#[tauri::command]
 fn write_text_file(path: String, contents: String) -> Result<(), String> {
     fs::write(path, contents).map_err(|error| format!("无法保存文件：{error}"))
 }
@@ -235,6 +363,7 @@ fn write_text_file(path: String, contents: String) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -243,8 +372,25 @@ pub fn run() {
             preview_rename,
             copy_renamed_files,
             convert_image,
+            recognize_image_file,
+            recognize_clipboard_image,
             write_text_file
         ])
         .run(tauri::generate_context!())
         .expect("启动 OmniKit 失败");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expected_rgba_bytes;
+
+    #[test]
+    fn reports_expected_rgba_byte_count() {
+        assert_eq!(expected_rgba_bytes(2, 3), Ok(24));
+    }
+
+    #[test]
+    fn rejects_zero_sized_images() {
+        assert!(expected_rgba_bytes(0, 120).is_err());
+    }
 }

@@ -4,9 +4,19 @@ import { Sidebar, type AppView } from './components/Sidebar';
 import { ToolHome } from './components/ToolHome';
 import { ToolWorkspace } from './components/ToolWorkspace';
 import { Topbar } from './components/Topbar';
+import {
+  appendClipboardText,
+  clearUnpinnedClipboardEntries,
+  loadClipboardHistory,
+  removeClipboardEntry,
+  toggleClipboardPin,
+} from './lib/clipboardHistory';
+import { isDesktopRuntime, readClipboardText } from './lib/native';
 import { searchTools, TOOL_BY_ID, type Category, type ToolId } from './lib/registry';
 
 const STORAGE_PREFIX = 'omnikit.v1.';
+const CLIPBOARD_HISTORY_STORAGE_KEY = STORAGE_PREFIX + 'clipboard-history';
+const CLIPBOARD_RECORDING_STORAGE_KEY = STORAGE_PREFIX + 'clipboard-recording';
 
 function loadToolList(key: string): ToolId[] {
   try {
@@ -24,6 +34,8 @@ export default function App() {
   const [activeToolId, setActiveToolId] = useState<ToolId | null>(null);
   const [recent, setRecent] = useState<ToolId[]>(() => loadToolList('recent'));
   const [favorites, setFavorites] = useState<ToolId[]>(() => loadToolList('favorites'));
+  const [clipboardEntries, setClipboardEntries] = useState(() => loadClipboardHistory(localStorage.getItem(CLIPBOARD_HISTORY_STORAGE_KEY)));
+  const [isClipboardRecording, setIsClipboardRecording] = useState(() => localStorage.getItem(CLIPBOARD_RECORDING_STORAGE_KEY) !== 'false');
   const [reducedMotion, setReducedMotion] = useState(() => localStorage.getItem(`${STORAGE_PREFIX}reduced-motion`) === 'true');
 
   const recentTools = useMemo(() => recent.map((id) => TOOL_BY_ID.get(id)).filter((tool): tool is NonNullable<typeof tool> => Boolean(tool)), [recent]);
@@ -39,6 +51,30 @@ export default function App() {
   useEffect(() => { localStorage.setItem(`${STORAGE_PREFIX}recent`, JSON.stringify(recent)); }, [recent]);
   useEffect(() => { localStorage.setItem(`${STORAGE_PREFIX}favorites`, JSON.stringify(favorites)); }, [favorites]);
   useEffect(() => { localStorage.setItem(`${STORAGE_PREFIX}reduced-motion`, String(reducedMotion)); }, [reducedMotion]);
+
+  useEffect(() => { localStorage.setItem(CLIPBOARD_HISTORY_STORAGE_KEY, JSON.stringify(clipboardEntries)); }, [clipboardEntries]);
+  useEffect(() => { localStorage.setItem(CLIPBOARD_RECORDING_STORAGE_KEY, String(isClipboardRecording)); }, [isClipboardRecording]);
+  useEffect(() => {
+    if (!isClipboardRecording || !isDesktopRuntime()) return;
+
+    let cancelled = false;
+    let reading = false;
+    const collectClipboardText = async () => {
+      if (cancelled || reading) return;
+      reading = true;
+      try {
+        const text = await readClipboardText();
+        if (!cancelled) setClipboardEntries((current) => appendClipboardText(current, text, Date.now()));
+      } catch {
+        // Clipboard access can be briefly unavailable while another app owns it.
+      } finally {
+        reading = false;
+      }
+    };
+    void collectClipboardText();
+    const interval = window.setInterval(() => void collectClipboardText(), 850);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [isClipboardRecording]);
 
   const openTool = (id: ToolId) => {
     setActiveToolId(id);
@@ -61,7 +97,19 @@ export default function App() {
       <section className={activeTool ? 'app-main is-workspace' : 'app-main'}>
         <Topbar compact={Boolean(activeTool)} query={query} onQueryChange={(value) => { setQuery(value); setActiveToolId(null); setActiveView('home'); }} />
         <div className="app-content">
-          {activeTool ? <ToolWorkspace tool={activeTool} isFavorite={favorites.includes(activeTool.id)} onBack={showHome} onToggleFavorite={toggleFavorite} /> : activeView === 'settings' ? <SettingsPanel recentCount={recent.length} favoriteCount={favorites.length} reducedMotion={reducedMotion} onReducedMotionChange={setReducedMotion} onClearRecent={() => setRecent([])} onClearFavorites={() => setFavorites([])} /> : activeView === 'about' ? <AboutPanel /> : <ToolHome {...screenCopy} tools={visibleTools} recent={recent} favorites={favorites} onOpenTool={openTool} onToggleFavorite={toggleFavorite} />}
+          {activeTool ? <ToolWorkspace
+            tool={activeTool}
+            isFavorite={favorites.includes(activeTool.id)}
+            onBack={showHome}
+            onToggleFavorite={toggleFavorite}
+            clipboardEntries={clipboardEntries}
+            isClipboardRecording={isClipboardRecording}
+            onClipboardRecordingChange={setIsClipboardRecording}
+            onClipboardEntryRemove={(id) => setClipboardEntries((current) => removeClipboardEntry(current, id))}
+            onClipboardPinToggle={(id) => setClipboardEntries((current) => toggleClipboardPin(current, id))}
+            onClipboardClear={() => setClipboardEntries((current) => clearUnpinnedClipboardEntries(current))}
+            onClipboardCopied={(text) => setClipboardEntries((current) => appendClipboardText(current, text, Date.now()))}
+          /> : activeView === 'settings' ? <SettingsPanel recentCount={recent.length} favoriteCount={favorites.length} reducedMotion={reducedMotion} onReducedMotionChange={setReducedMotion} onClearRecent={() => setRecent([])} onClearFavorites={() => setFavorites([])} /> : activeView === 'about' ? <AboutPanel /> : <ToolHome {...screenCopy} tools={visibleTools} recent={recent} favorites={favorites} onOpenTool={openTool} onToggleFavorite={toggleFavorite} />}
         </div>
       </section>
     </main>

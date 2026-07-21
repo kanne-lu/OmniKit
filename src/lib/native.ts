@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { readImage, readText, writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { open, save } from '@tauri-apps/plugin-dialog';
 
 export interface HashResult {
@@ -20,6 +21,16 @@ export interface ImageResult {
   bytes: number;
   width: number;
   height: number;
+}
+
+export interface ClipboardImage {
+  width: number;
+  height: number;
+  bytes: number[];
+}
+
+export interface OcrResult {
+  text: string;
 }
 
 export function isDesktopRuntime(): boolean {
@@ -50,6 +61,27 @@ export async function saveText(contents: string, defaultName: string): Promise<b
   return true;
 }
 
+export async function readClipboardText(): Promise<string> {
+  ensureDesktop();
+  return readText();
+}
+
+export async function writeClipboardText(contents: string): Promise<void> {
+  ensureDesktop();
+  await writeText(contents);
+}
+
+export async function readClipboardImage(): Promise<ClipboardImage> {
+  ensureDesktop();
+  const image = await readImage();
+  const size = await image.size();
+  return {
+    width: size.width,
+    height: size.height,
+    bytes: Array.from(await image.rgba()),
+  };
+}
+
 export const native = {
   hashFile: (path: string) => invoke<HashResult>('hash_file', { path }),
   previewRename: (inputDir: string, outputDir: string, prefix: string, startNumber: number, separator: string) =>
@@ -58,4 +90,7 @@ export const native = {
     invoke<number>('copy_renamed_files', { inputDir, outputDir, prefix, startNumber, separator }),
   convertImage: (inputPath: string, outputDir: string, format: string, maxDimension: number, quality: number) =>
     invoke<ImageResult>('convert_image', { inputPath, outputDir, format, maxDimension, quality }),
+  recognizeImageFile: (path: string) => invoke<OcrResult>('recognize_image_file', { path }),
+  recognizeClipboardImage: ({ width, height, bytes }: ClipboardImage) =>
+    invoke<OcrResult>('recognize_clipboard_image', { width, height, bytes }),
 };

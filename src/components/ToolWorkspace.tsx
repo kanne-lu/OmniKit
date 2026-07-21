@@ -1,23 +1,47 @@
 import { ArrowLeft, Star } from 'lucide-react';
 import type { ToolDefinition, ToolId } from '../lib/registry';
+import type { ClipboardHistoryEntry } from '../lib/clipboardHistory';
+import { ClipboardTool } from './ClipboardTool';
 import { CodecTool } from './CodecTool';
 import { HashTool, ImageTool, RenameTool } from './FileTools';
 import { JsonTool } from './JsonTool';
+import { OcrTool } from './OcrTool';
 
 interface ToolWorkspaceProps {
   tool: ToolDefinition;
   isFavorite: boolean;
   onBack: () => void;
   onToggleFavorite: (id: ToolId) => void;
+  clipboardEntries: ClipboardHistoryEntry[];
+  isClipboardRecording: boolean;
+  onClipboardRecordingChange: (value: boolean) => void;
+  onClipboardEntryRemove: (id: string) => void;
+  onClipboardPinToggle: (id: string) => void;
+  onClipboardClear: () => void;
+  onClipboardCopied: (text: string) => void;
 }
 
-export function ToolWorkspace({ tool, isFavorite, onBack, onToggleFavorite }: ToolWorkspaceProps) {
+export function ToolWorkspace({
+  tool,
+  isFavorite,
+  onBack,
+  onToggleFavorite,
+  clipboardEntries,
+  isClipboardRecording,
+  onClipboardRecordingChange,
+  onClipboardEntryRemove,
+  onClipboardPinToggle,
+  onClipboardClear,
+  onClipboardCopied,
+}: ToolWorkspaceProps) {
   const content = {
     json: <JsonTool />,
     base64: <CodecTool />,
+    clipboard: <ClipboardTool entries={clipboardEntries} isRecording={isClipboardRecording} onRecordingChange={onClipboardRecordingChange} onRemove={onClipboardEntryRemove} onTogglePin={onClipboardPinToggle} onClear={onClipboardClear} onCopied={onClipboardCopied} />,
     hash: <HashTool />,
     rename: <RenameTool />,
     image: <ImageTool />,
+    ocr: <OcrTool />,
   }[tool.id];
 
   return (

@@ -1,8 +1,8 @@
 export const CATEGORIES = ['文本与编码', '文件处理', '图片处理', '开发工具'] as const;
 
 export type Category = (typeof CATEGORIES)[number];
-export type ToolId = 'json' | 'base64' | 'hash' | 'rename' | 'image';
-export type ToolIcon = 'braces' | 'binary' | 'hash' | 'rename' | 'image';
+export type ToolId = 'json' | 'base64' | 'clipboard' | 'hash' | 'rename' | 'image' | 'ocr';
+export type ToolIcon = 'braces' | 'binary' | 'clipboard' | 'hash' | 'rename' | 'image' | 'ocr';
 
 export interface ToolDefinition {
   id: ToolId;
@@ -31,6 +31,14 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     keywords: ['base64', '编码', '解码', 'url'],
   },
   {
+    id: 'clipboard',
+    name: '剪贴板历史',
+    description: '查找、置顶并再次复制最近的文本与链接',
+    category: '文本与编码',
+    icon: 'clipboard',
+    keywords: ['剪贴板', '复制', '历史', '文本', '链接'],
+  },
+  {
     id: 'hash',
     name: '文件哈希',
     description: '计算 MD5、SHA-1 与 SHA-256 校验值',
@@ -53,6 +61,14 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     category: '图片处理',
     icon: 'image',
     keywords: ['图片', '压缩', '转换', 'jpg', 'png', 'webp'],
+  },
+  {
+    id: 'ocr',
+    name: '截图识字',
+    description: '识别截图或本地图片中的中文、英文文字',
+    category: '图片处理',
+    icon: 'ocr',
+    keywords: ['ocr', '截图', '识字', '文字识别', '图片文字'],
   },
 ];
 
