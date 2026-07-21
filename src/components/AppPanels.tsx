@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CircleCheck, CircleHelp, Database, Download, RefreshCw, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react';
 import type { Update } from '@tauri-apps/plugin-updater';
+import { BrandMark } from './BrandMark';
 import { checkForUpdate, getUpdateRuntime, installUpdate, type UpdateRuntime } from '../lib/updater';
 
 interface SettingsPanelProps {
@@ -88,7 +89,7 @@ export function AboutPanel() {
     <header className="info-heading"><span className="section-kicker">OMNIKIT</span><h1 id="about-title">关于</h1><p>为日常处理任务准备的本地工具箱。</p></header>
     <div className="about-layout">
       <article className="about-card">
-        <div className="about-card-header"><div className="about-mark"><span className="brand-mark" aria-hidden="true"><span /></span><div><strong>OmniKit</strong><small>桌面端全能工具集合</small></div></div><span className="about-version">v0.1.2</span></div>
+        <div className="about-card-header"><div className="about-mark"><BrandMark /><div><strong>OmniKit</strong><small>桌面端全能工具集合</small></div></div><span className="about-version">v0.1.2</span></div>
         <p className="about-summary">把常用的文本、文件和图片处理任务集中到一个安静的本地工作台中。</p>
         <dl className="about-specs"><div><dt>运行方式</dt><dd>本机处理</dd></div><div><dt>内置工具</dt><dd>5 项</dd></div><div><dt>界面字体</dt><dd>HarmonyOS Sans SC</dd></div><div><dt>输出策略</dt><dd>先预览，再生成副本</dd></div></dl>
         <p className="about-note"><ShieldCheck size={19} /> 文本与文件默认不会上传到网络。</p>

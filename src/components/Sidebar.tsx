@@ -8,6 +8,7 @@ import {
   Settings2,
   Star,
 } from 'lucide-react';
+import { BrandMark } from './BrandMark';
 import { CATEGORIES, type Category } from '../lib/registry';
 
 export type AppView = 'home' | 'recent' | 'favorites' | 'settings' | 'about';
@@ -32,7 +33,7 @@ export function Sidebar({ activeView, activeCategory, onCategoryChange, onNaviga
   return (
     <aside className="sidebar">
       <button className="brand" type="button" onClick={() => onNavigate('home')} aria-label="返回 OmniKit 工作台">
-        <span className="brand-mark" aria-hidden="true"><span /></span>
+        <BrandMark />
         <span>OmniKit</span>
       </button>
 

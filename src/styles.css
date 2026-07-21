@@ -58,10 +58,7 @@ h1, h2, h3, p { margin: 0; }
 .app-shell { display: flex; min-height: 100vh; overflow: hidden; background: var(--canvas); }
 .sidebar { display: flex; width: 216px; min-height: 100vh; flex: 0 0 216px; flex-direction: column; border-right: 1px solid var(--line); background: var(--sidebar); padding: 17px 10px 14px; }
 .brand { display: flex; align-items: center; gap: 9px; border: 0; background: transparent; padding: 7px 10px 25px; color: var(--ink); font-size: 20px; font-weight: 700; letter-spacing: -.7px; text-align: left; cursor: pointer; }
-.brand-mark { position: relative; display: grid; width: 25px; height: 25px; flex: 0 0 auto; place-items: center; overflow: hidden; border-radius: 6px; background: var(--blue); color: white; }
-.brand-mark::before, .brand-mark span { content: ""; display: block; width: 12px; height: 12px; border: 2px solid currentColor; }
-.brand-mark::before { border-right: 0; border-bottom: 0; transform: translate(1px, 1px); }
-.brand-mark span { position: absolute; border-left: 0; border-top: 0; transform: translate(-1px, -1px); }
+.brand-mark { display: block; width: 25px; height: 25px; flex: 0 0 auto; object-fit: contain; }
 .sidebar-primary, .category-nav { display: grid; gap: 2px; }
 .nav-row { display: flex; min-height: 38px; align-items: center; width: 100%; gap: 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; padding: 0 10px; color: #52687c; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; transition: color .14s ease, background .14s ease, border-color .14s ease; }
 .nav-row:hover { background: #eef5fa; color: #245f93; }

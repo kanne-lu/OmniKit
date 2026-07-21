@@ -1,4 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#347ebd"/>
-  <path d="M18 18h20v9H27v10h-9V18Zm28 28H26v-9h11V27h9v19Z" fill="#fff"/>
+  <defs>
+    <linearGradient id="omnikit-blue" x1="8" y1="6" x2="57" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1aa9ff"/>
+      <stop offset="1" stop-color="#1255dd"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#omnikit-blue)"/>
+  <path d="M39 19H25a6 6 0 0 0-6 6v16a10 10 0 0 0 10 10h10a7 7 0 0 0 7-7V31" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <rect x="42" y="12" width="10" height="10" rx="3" fill="#fff"/>
 </svg>
