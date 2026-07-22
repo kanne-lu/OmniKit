@@ -134,6 +134,11 @@ fn expected_rgba_bytes(width: u32, height: u32) -> Result<usize, String> {
     usize::try_from(bytes).map_err(|_| "截图尺寸过大，无法识别".to_owned())
 }
 
+fn winrt_storage_path(path: &Path) -> String {
+    let path = path.to_string_lossy();
+    path.strip_prefix(r"\\?\").unwrap_or(&path).to_owned()
+}
+
 #[cfg(target_os = "windows")]
 fn create_ocr_engine() -> Result<windows::Media::Ocr::OcrEngine, String> {
     use windows::core::HSTRING;
@@ -168,7 +173,7 @@ fn recognize_windows_image(path: &Path) -> Result<String, String> {
         return Err("请选择一张本地图片".to_owned());
     }
 
-    let path_string = HSTRING::from(path.to_string_lossy().to_string());
+    let path_string = HSTRING::from(winrt_storage_path(&path));
     let file = StorageFile::GetFileFromPathAsync(&path_string)
         .map_err(|error| format!("无法打开图片：{error}"))?
         .get()
@@ -382,7 +387,16 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::expected_rgba_bytes;
+    use super::{expected_rgba_bytes, winrt_storage_path};
+    use std::path::Path;
+
+    #[test]
+    fn removes_extended_windows_path_prefix_before_calling_winrt() {
+        assert_eq!(
+            winrt_storage_path(Path::new(r"\\?\C:\Users\Administrator\Desktop\sample.png")),
+            r"C:\Users\Administrator\Desktop\sample.png"
+        );
+    }
 
     #[test]
     fn reports_expected_rgba_byte_count() {
