@@ -82,8 +82,10 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
 .window-controls button { display: grid; width: 44px; place-items: center; border: 0; background: transparent; color: #718394; cursor: pointer; transition: background .14s ease, color .14s ease; }
 .window-controls button:hover { background: #eaf3fa; color: #245f93; }
 .window-controls .close-control:hover { background: #c9535b; color: white; }
-.app-mascot { position: absolute; z-index: 2; top: 70px; left: 55%; width: min(184px, 18vw); pointer-events: none; transform: translateX(-50%); user-select: none; }
-.app-mascot img { display: block; width: 100%; height: auto; transform: scaleX(-1); transform-origin: center; }
+.app-mascot { position: absolute; z-index: 2; top: 36px; left: 55%; width: min(260px, 22vw); pointer-events: none; transform: translateX(-50%); user-select: none; }
+.app-mascot img { position: relative; z-index: 1; display: block; width: 100%; height: auto; transform: scaleX(-1); transform-origin: center bottom; animation: mascot-breathe 5.2s ease-in-out infinite; }
+.mascot-steam { position: absolute; z-index: 3; top: 52%; left: 7%; width: 19%; height: 24%; background: radial-gradient(ellipse at 35% 72%, rgb(160 190 207 / 42%) 0 8%, transparent 32%), radial-gradient(ellipse at 68% 48%, rgb(160 190 207 / 34%) 0 7%, transparent 29%), radial-gradient(ellipse at 43% 18%, rgb(160 190 207 / 24%) 0 6%, transparent 27%); filter: blur(1px); opacity: 0; animation: mascot-steam 3.6s ease-out infinite; }
+.mascot-key-glow { position: absolute; z-index: 2; bottom: 7%; left: 27%; width: 42%; height: 11%; border-radius: 50%; background: radial-gradient(ellipse, rgb(72 165 226 / 42%) 0%, rgb(72 165 226 / 13%) 46%, transparent 74%); filter: blur(3px); opacity: .08; transform: skewX(-8deg); animation: mascot-key-glow 3.2s ease-in-out infinite; }
 .app-content { height: calc(100vh - 64px); overflow: auto; scrollbar-color: #bfd0dc transparent; scrollbar-width: thin; }
 .app-main.is-workspace .topbar { height: 34px; justify-content: flex-end; border-bottom: 0; background: transparent; }
 .app-main.is-workspace .search-field { display: none; }
@@ -394,11 +396,14 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
 
 @keyframes about-reveal { from { opacity: 0; transform: translate3d(0, 9px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
 @keyframes about-mark-breathe { 0%, 100% { box-shadow: 0 5px 13px rgb(41 111 170 / 20%); } 50% { box-shadow: 0 7px 18px rgb(41 111 170 / 31%); } }
+@keyframes mascot-breathe { 0%, 100% { transform: scaleX(-1) translateY(0) scale(1); filter: drop-shadow(0 5px 6px rgb(45 73 91 / 9%)); } 50% { transform: scaleX(-1) translateY(-2px) scale(1.012); filter: drop-shadow(0 8px 9px rgb(45 73 91 / 14%)); } }
+@keyframes mascot-steam { 0% { opacity: 0; transform: translate3d(0, 4px, 0) scale(.84); } 28% { opacity: .72; } 72% { opacity: .38; } 100% { opacity: 0; transform: translate3d(-3px, -12px, 0) scale(1.18); } }
+@keyframes mascot-key-glow { 0%, 100% { opacity: .06; transform: skewX(-8deg) scaleX(.9); } 50% { opacity: .34; transform: skewX(-8deg) scaleX(1.08); } }
 
 .reduced-motion *, .reduced-motion *::before, .reduced-motion *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 
 @media (prefers-reduced-motion: reduce) {
-  .about-view *, .about-view *::before, .about-view *::after { animation: none !important; transition-duration: .01ms !important; }
+  .about-view *, .about-view *::before, .about-view *::after, .app-mascot *, .app-mascot *::before, .app-mascot *::after { animation: none !important; transition-duration: .01ms !important; }
 }
 
 @media (max-width: 1080px) {
@@ -426,7 +431,7 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
   .window-controls { display: none; }
   .search-field { width: 100%; }
   .app-content, .app-main.is-workspace .app-content { height: auto; overflow: visible; }
-  .app-mascot { top: 67px; left: 66%; width: 126px; }
+  .app-mascot { top: 58px; left: 68%; width: 150px; }
   .app-main.is-workspace .topbar { height: 24px; }
   .home-view, .info-view, .workspace-view { padding: 22px 15px 34px; }
   .home-header { align-items: flex-start; flex-direction: column; gap: 13px; padding-bottom: 18px; }

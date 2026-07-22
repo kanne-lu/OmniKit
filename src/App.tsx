@@ -106,6 +106,8 @@ export default function App() {
       <section className={activeTool ? 'app-main is-workspace' : 'app-main'}>
         <Topbar compact={Boolean(activeTool)} query={query} onQueryChange={(value) => { setQuery(value); setActiveToolId(null); setActiveView('home'); }} />
         <div className="app-mascot" aria-hidden="true">
+          <span className="mascot-steam" />
+          <span className="mascot-key-glow" />
           <img src={mascotImage} alt="" />
         </div>
         <div className="app-content">
