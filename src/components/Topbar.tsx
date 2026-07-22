@@ -8,7 +8,7 @@ interface TopbarProps {
   compact?: boolean;
 }
 
-async function controlWindow(action: 'minimize' | 'toggleMaximize' | 'close') {
+async function controlWindow(action: 'minimize' | 'toggleMaximize' | 'close' | 'startDragging') {
   if (!isDesktopRuntime()) return;
   const { getCurrentWindow } = await import('@tauri-apps/api/window');
   await getCurrentWindow()[action]();
@@ -30,7 +30,12 @@ export function Topbar({ query, onQueryChange, compact = false }: TopbarProps) {
   }, [compact]);
 
   return (
-    <header className={compact ? 'topbar is-compact' : 'topbar'} data-tauri-drag-region>
+    <header
+      className={compact ? 'topbar is-compact' : 'topbar'}
+      onMouseDown={(event) => {
+        if (event.button === 0 && event.target === event.currentTarget) void controlWindow('startDragging');
+      }}
+    >
       <label className="search-field">
         <Search size={21} aria-hidden="true" />
         <input ref={searchInputRef} value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索工具" aria-label="搜索工具" aria-keyshortcuts="Control+K Meta+K" />

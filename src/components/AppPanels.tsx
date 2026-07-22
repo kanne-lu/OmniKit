@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CircleCheck, CircleHelp, Database, Download, RefreshCw, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react';
+import { Braces, CircleCheck, CircleHelp, Database, Download, Files, Image as ImageIcon, RefreshCw, ShieldCheck, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
 import type { Update } from '@tauri-apps/plugin-updater';
 import { BrandMark } from './BrandMark';
 import { checkForUpdate, getUpdateRuntime, installUpdate, type UpdateRuntime } from '../lib/updater';
@@ -89,15 +89,28 @@ export function AboutPanel() {
     <header className="info-heading"><span className="section-kicker">OMNIKIT</span><h1 id="about-title">关于</h1><p>为日常处理任务准备的本地工具箱。</p></header>
     <div className="about-layout">
       <article className="about-card">
-        <div className="about-card-header"><div className="about-mark"><BrandMark /><div><strong>OmniKit</strong><small>桌面端全能工具集合</small></div></div><span className="about-version">v0.1.2</span></div>
-        <p className="about-summary">把常用的文本、文件和图片处理任务集中到一个安静的本地工作台中。</p>
-        <dl className="about-specs"><div><dt>运行方式</dt><dd>本机处理</dd></div><div><dt>内置工具</dt><dd>5 项</dd></div><div><dt>界面字体</dt><dd>HarmonyOS Sans SC</dd></div><div><dt>输出策略</dt><dd>先预览，再生成副本</dd></div></dl>
+        <div className="about-card-header"><div className="about-mark"><BrandMark /><div><strong>OmniKit</strong><small>桌面端全能工具集合</small></div></div><span className="about-version">v0.1.3</span></div>
+        <div className="about-intro">
+          <div>
+            <span className="section-kicker">一站式本地工具箱</span>
+            <h2>把高频的小任务，收进一个安静的工作台。</h2>
+            <p>OmniKit 为文本、文件和图片处理准备了顺手的本地工具。无需在网页、临时脚本和多个小软件之间来回切换，打开即可开始处理。</p>
+          </div>
+          <span className="about-spark" aria-hidden="true"><Sparkles size={28} /></span>
+        </div>
+        <div className="about-capabilities" aria-label="OmniKit 覆盖的工具类型">
+          <span><Braces size={17} /> 文本与编码</span>
+          <span><Files size={17} /> 文件处理</span>
+          <span><ImageIcon size={17} /> 图片工具</span>
+        </div>
         <p className="about-note"><ShieldCheck size={19} /> 文本与文件默认不会上传到网络。</p>
         <UpdatePanel />
       </article>
-      <aside className="about-aside" aria-label="使用原则">
-        <span className="section-kicker">使用原则</span>
-        <ol className="about-principles"><li><span>01</span><div><strong>本地优先</strong><p>处理过程留在当前设备。</p></div></li><li><span>02</span><div><strong>结果可控</strong><p>文件任务先确认，再写入输出。</p></div></li></ol>
+      <aside className="about-aside" aria-label="OmniKit 简介">
+        <span className="section-kicker">为什么是 OmniKit</span>
+        <h2>少一点切换，多一点专注。</h2>
+        <p className="about-aside-summary">把日常会反复遇到的处理需求留在一个轻量、清晰的桌面应用中。</p>
+        <ol className="about-principles"><li><span>01</span><div><strong>常用工具集中</strong><p>从格式化文本到处理图片，随时打开即可使用。</p></div></li><li><span>02</span><div><strong>本地处理为先</strong><p>内容留在设备中，让隐私和结果都更安心。</p></div></li><li><span>03</span><div><strong>体验保持简单</strong><p>专注完成任务，不用学习复杂的工作流程。</p></div></li></ol>
       </aside>
     </div>
   </section>;

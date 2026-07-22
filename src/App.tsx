@@ -36,6 +36,7 @@ export default function App() {
   const [favorites, setFavorites] = useState<ToolId[]>(() => loadToolList('favorites'));
   const [clipboardEntries, setClipboardEntries] = useState(() => loadClipboardHistory(localStorage.getItem(CLIPBOARD_HISTORY_STORAGE_KEY)));
   const [isClipboardRecording, setIsClipboardRecording] = useState(() => localStorage.getItem(CLIPBOARD_RECORDING_STORAGE_KEY) !== 'false');
+  const [clipboardError, setClipboardError] = useState<string | null>(null);
   const [reducedMotion, setReducedMotion] = useState(() => localStorage.getItem(`${STORAGE_PREFIX}reduced-motion`) === 'true');
 
   const recentTools = useMemo(() => recent.map((id) => TOOL_BY_ID.get(id)).filter((tool): tool is NonNullable<typeof tool> => Boolean(tool)), [recent]);
@@ -64,8 +65,15 @@ export default function App() {
       reading = true;
       try {
         const text = await readClipboardText();
-        if (!cancelled) setClipboardEntries((current) => appendClipboardText(current, text, Date.now()));
-      } catch {
+        if (!cancelled) {
+          setClipboardEntries((current) => appendClipboardText(current, text, Date.now()));
+          setClipboardError(null);
+        }
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : '';
+        if (!cancelled && /clipboard-manager|permission|not allowed/i.test(detail)) {
+          setClipboardError('无法访问系统剪贴板。请重启更新后的 OmniKit 后重试。');
+        }
         // Clipboard access can be briefly unavailable while another app owns it.
       } finally {
         reading = false;
@@ -104,6 +112,7 @@ export default function App() {
             onToggleFavorite={toggleFavorite}
             clipboardEntries={clipboardEntries}
             isClipboardRecording={isClipboardRecording}
+            clipboardError={clipboardError}
             onClipboardRecordingChange={setIsClipboardRecording}
             onClipboardEntryRemove={(id) => setClipboardEntries((current) => removeClipboardEntry(current, id))}
             onClipboardPinToggle={(id) => setClipboardEntries((current) => toggleClipboardPin(current, id))}

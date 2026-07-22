@@ -2,6 +2,17 @@ import { Check, ClipboardPaste, Copy, FileImage, LoaderCircle, ScanText, ShieldC
 import { useState } from 'react';
 import { chooseFile, isDesktopRuntime, native, readClipboardImage, writeClipboardText } from '../lib/native';
 
+function describeOcrError(error: unknown, source: 'clipboard' | 'file'): string {
+  const detail = error instanceof Error ? error.message.trim() : '';
+  if (/clipboard-manager|permission|not allowed/i.test(detail)) {
+    return '无法读取系统剪贴板图片。请重启更新后的 OmniKit 后，再使用 Win + Shift + S 截图。';
+  }
+  if (source === 'clipboard' && /image|clipboard|content/i.test(detail)) {
+    return '没有读取到剪贴板图片。请先使用 Win + Shift + S 完成截图，再点击识别。';
+  }
+  return detail || '文字识别失败，请重新截图或选择更清晰的图片。';
+}
+
 export function OcrTool() {
   const [result, setResult] = useState('');
   const [source, setSource] = useState('');
@@ -9,7 +20,7 @@ export function OcrTool() {
   const [pending, setPending] = useState(false);
   const desktop = isDesktopRuntime();
 
-  const runRecognition = async (sourceName: string, action: () => Promise<{ text: string }>) => {
+  const runRecognition = async (sourceName: string, sourceKind: 'clipboard' | 'file', action: () => Promise<{ text: string }>) => {
     setPending(true);
     setMessage('');
     try {
@@ -17,20 +28,20 @@ export function OcrTool() {
       setSource(sourceName);
       setResult(next.text);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '文字识别失败，请重试');
+      setMessage(describeOcrError(error, sourceKind));
     } finally {
       setPending(false);
     }
   };
 
-  const recognizeClipboard = () => runRecognition('剪贴板截图', async () => native.recognizeClipboardImage(await readClipboardImage()));
+  const recognizeClipboard = () => runRecognition('剪贴板截图', 'clipboard', async () => native.recognizeClipboardImage(await readClipboardImage()));
 
   const recognizeFile = async () => {
     try {
       const path = await chooseFile([{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'bmp', 'webp'] }]);
       if (!path) return;
       const fileName = path.split(/[\\/]/).pop() ?? '本地图片';
-      await runRecognition(fileName, () => native.recognizeImageFile(path));
+      await runRecognition(fileName, 'file', () => native.recognizeImageFile(path));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '无法选择图片');
     }

@@ -14,6 +14,7 @@ interface ToolWorkspaceProps {
   onToggleFavorite: (id: ToolId) => void;
   clipboardEntries: ClipboardHistoryEntry[];
   isClipboardRecording: boolean;
+  clipboardError: string | null;
   onClipboardRecordingChange: (value: boolean) => void;
   onClipboardEntryRemove: (id: string) => void;
   onClipboardPinToggle: (id: string) => void;
@@ -28,6 +29,7 @@ export function ToolWorkspace({
   onToggleFavorite,
   clipboardEntries,
   isClipboardRecording,
+  clipboardError,
   onClipboardRecordingChange,
   onClipboardEntryRemove,
   onClipboardPinToggle,
@@ -37,7 +39,7 @@ export function ToolWorkspace({
   const content = {
     json: <JsonTool />,
     base64: <CodecTool />,
-    clipboard: <ClipboardTool entries={clipboardEntries} isRecording={isClipboardRecording} onRecordingChange={onClipboardRecordingChange} onRemove={onClipboardEntryRemove} onTogglePin={onClipboardPinToggle} onClear={onClipboardClear} onCopied={onClipboardCopied} />,
+    clipboard: <ClipboardTool entries={clipboardEntries} isRecording={isClipboardRecording} error={clipboardError} onRecordingChange={onClipboardRecordingChange} onRemove={onClipboardEntryRemove} onTogglePin={onClipboardPinToggle} onClear={onClipboardClear} onCopied={onClipboardCopied} />,
     hash: <HashTool />,
     rename: <RenameTool />,
     image: <ImageTool />,

@@ -6,6 +6,7 @@ import { isDesktopRuntime, writeClipboardText } from '../lib/native';
 interface ClipboardToolProps {
   entries: ClipboardHistoryEntry[];
   isRecording: boolean;
+  error: string | null;
   onRecordingChange: (value: boolean) => void;
   onRemove: (id: string) => void;
   onTogglePin: (id: string) => void;
@@ -22,12 +23,12 @@ function formatCapturedAt(value: number): string {
     : new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
-export function ClipboardTool({ entries, isRecording, onRecordingChange, onRemove, onTogglePin, onClear, onCopied }: ClipboardToolProps) {
+export function ClipboardTool({ entries, isRecording, error, onRecordingChange, onRemove, onTogglePin, onClear, onCopied }: ClipboardToolProps) {
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
   const visibleEntries = useMemo(() => searchClipboardHistory(entries, query), [entries, query]);
   const desktop = isDesktopRuntime();
-  const recordingActive = isRecording && desktop;
+  const recordingActive = isRecording && desktop && !error;
   const pinnedCount = entries.filter((entry) => entry.pinned).length;
 
   const copyEntry = async (entry: ClipboardHistoryEntry) => {
@@ -60,7 +61,7 @@ export function ClipboardTool({ entries, isRecording, onRecordingChange, onRemov
         <div className="clipboard-panel-header">
           <label className="history-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索复制过的内容" aria-label="搜索剪贴板历史" /></label>
           <div className={recordingActive ? 'recording-state' : 'recording-state is-paused'}>
-            <span className="status-dot" />{recordingActive ? '正在记录' : '记录已暂停'}
+            <span className="status-dot" />{recordingActive ? '正在记录' : error ?? '记录已暂停'}
           </div>
         </div>
 
