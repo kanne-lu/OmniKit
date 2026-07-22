@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Braces, CircleCheck, CircleHelp, Database, Download, Files, Image as ImageIcon, KeyRound, RefreshCw, Save, ShieldCheck, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
 import type { Update } from '@tauri-apps/plugin-updater';
 import { BrandMark } from './BrandMark';
-import { AI_SERVICE_STORAGE_KEY, parseAiServiceConfig, validateAiServiceConfig } from '../lib/aiService';
+import { AI_SERVICE_STORAGE_KEY, getNativeErrorMessage, parseAiServiceConfig, validateAiServiceConfig } from '../lib/aiService';
 import { isDesktopRuntime, native, type AiServiceConfig } from '../lib/native';
 import { checkForUpdate, getUpdateRuntime, installUpdate, type UpdateRuntime } from '../lib/updater';
 
@@ -49,7 +49,7 @@ export function SettingsPanel({ recentCount, favoriteCount, reducedMotion, onRed
       setAiConfig(normalized);
       setAiMessage(keyConfigured || apiKey.trim() ? 'AI 服务配置已保存在当前设备。' : '地址与模型已保存；请继续填写 API 密钥。');
     } catch (error) {
-      setAiMessage(error instanceof Error ? error.message : '保存 AI 配置失败，请重试。');
+      setAiMessage(getNativeErrorMessage(error, '保存 AI 配置失败，请重试。'));
     } finally {
       setAiPending(false);
     }
@@ -65,7 +65,7 @@ export function SettingsPanel({ recentCount, favoriteCount, reducedMotion, onRed
       setApiKey('');
       setAiMessage('已从 Windows 凭据管理器删除 API 密钥。');
     } catch (error) {
-      setAiMessage(error instanceof Error ? error.message : '删除 API 密钥失败，请重试。');
+      setAiMessage(getNativeErrorMessage(error, '删除 API 密钥失败，请重试。'));
     } finally {
       setAiPending(false);
     }

@@ -1,7 +1,7 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { Check, FileImage, FolderOpen, KeyRound, LoaderCircle, Printer, Save, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { AI_SERVICE_STORAGE_KEY, parseAiServiceConfig, validateAiServiceConfig } from '../lib/aiService';
+import { AI_SERVICE_STORAGE_KEY, getNativeErrorMessage, parseAiServiceConfig, validateAiServiceConfig } from '../lib/aiService';
 import { buildCopybookCells, COPYBOOK_PRESETS, countText, extractHanCharacters, type CopybookTemplate } from '../lib/education';
 import { chooseFile, chooseFolder, isDesktopRuntime, native, type AiHandwritingPreview, type AiServiceConfig, type ImageResult } from '../lib/native';
 
@@ -130,7 +130,7 @@ export function AiHandwritingRemovalTool() {
       setPreview(await native.previewAiHandwritingRemoval(inputPath, config));
       setMessage('AI 结果已生成，请先检查前后预览，再决定是否保存。');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'AI 去手写失败，请检查配置和网络。');
+      setMessage(getNativeErrorMessage(error, 'AI 去手写失败，请检查配置和网络。'));
     } finally {
       setPending(false);
     }
@@ -145,7 +145,7 @@ export function AiHandwritingRemovalTool() {
       setSavedResult(result);
       setMessage('AI 去手写结果已保存为新文件，原图未修改。');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '保存 AI 结果失败，请重试。');
+      setMessage(getNativeErrorMessage(error, '保存 AI 结果失败，请重试。'));
     } finally {
       setPending(false);
     }
