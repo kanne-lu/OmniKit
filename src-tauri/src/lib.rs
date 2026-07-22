@@ -337,27 +337,46 @@ fn convert_image(
     })
 }
 
-#[tauri::command]
-fn recognize_image_file(path: String) -> Result<OcrResult, String> {
-    recognize_windows_image(Path::new(&path)).map(|text| OcrResult { text })
+async fn run_ocr_in_background<F>(work: F) -> Result<OcrResult, String>
+where
+    F: FnOnce() -> Result<OcrResult, String> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|error| format!("OCR 任务异常终止：{error}"))?
 }
 
 #[tauri::command]
-fn recognize_clipboard_image(width: u32, height: u32, bytes: Vec<u8>) -> Result<OcrResult, String> {
-    let expected_bytes = expected_rgba_bytes(width, height)?;
-    if bytes.len() != expected_bytes {
-        return Err("截图数据不完整，请重新截图后再试".to_owned());
-    }
+async fn recognize_image_file(path: String) -> Result<OcrResult, String> {
+    run_ocr_in_background(move || {
+        recognize_windows_image(Path::new(&path)).map(|text| OcrResult { text })
+    })
+    .await
+}
 
-    let image = RgbaImage::from_raw(width, height, bytes)
-        .ok_or_else(|| "无法读取截图数据，请重新截图后再试".to_owned())?;
-    let path = temporary_ocr_image_path();
-    image
-        .save_with_format(&path, ImageFormat::Png)
-        .map_err(|error| format!("无法准备截图：{error}"))?;
-    let result = recognize_windows_image(&path);
-    let _ = fs::remove_file(&path);
-    result.map(|text| OcrResult { text })
+#[tauri::command]
+async fn recognize_clipboard_image(
+    width: u32,
+    height: u32,
+    bytes: Vec<u8>,
+) -> Result<OcrResult, String> {
+    run_ocr_in_background(move || {
+        let expected_bytes = expected_rgba_bytes(width, height)?;
+        if bytes.len() != expected_bytes {
+            return Err("截图数据不完整，请重新截图后再试".to_owned());
+        }
+
+        let image = RgbaImage::from_raw(width, height, bytes)
+            .ok_or_else(|| "无法读取截图数据，请重新截图后再试".to_owned())?;
+        let path = temporary_ocr_image_path();
+        image
+            .save_with_format(&path, ImageFormat::Png)
+            .map_err(|error| format!("无法准备截图：{error}"))?;
+        let result = recognize_windows_image(&path);
+        let _ = fs::remove_file(&path);
+        result.map(|text| OcrResult { text })
+    })
+    .await
 }
 
 #[tauri::command]
