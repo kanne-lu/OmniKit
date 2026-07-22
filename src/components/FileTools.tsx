@@ -31,7 +31,7 @@ export function HashTool() {
     try { setResult(await native.hashFile(path)); } catch (error) { setMessage(error instanceof Error ? error.message : '计算失败'); } finally { setPending(false); }
   };
   return <section className="tool-screen">
-    <div className="tool-breadcrumb">文件处理 <span>/</span> 文件哈希</div>
+    <div className="tool-breadcrumb">文件工具 <span>/</span> 文件哈希</div>
     <div className="tool-titlebar"><div><h1>文件哈希</h1><p>计算 MD5、SHA-1 与 SHA-256 校验值。</p></div></div>
     <div className="native-workbench">
       <div className="file-picker"><FileUp size={25} /><div><strong>{basename(path)}</strong><small>{path ? '已选择文件，准备计算。' : '选择一个本地文件开始。'}</small></div><button className="secondary-button" type="button" onClick={() => void select()}>选择文件</button></div>
@@ -65,7 +65,7 @@ export function RenameTool() {
     try { const count = await native.copyRenamedFiles(inputDir, outputDir, prefix, startNumber, separator); setMessage(`已输出 ${count} 个副本，原始文件未修改。`); } catch (error) { setMessage(error instanceof Error ? error.message : '输出失败'); } finally { setPending(false); }
   };
   return <section className="tool-screen">
-    <div className="tool-breadcrumb">文件处理 <span>/</span> 批量重命名</div>
+    <div className="tool-breadcrumb">文件工具 <span>/</span> 批量重命名</div>
     <div className="tool-titlebar"><div><h1>批量重命名</h1><p>先预览新文件名，再输出保留原文件的副本。</p></div></div>
     <div className="rename-form">
       <button className="path-field" type="button" onClick={() => void selectFolder(setInputDir)}><FolderOpen size={20} /><span><small>输入文件夹</small><strong>{inputDir ?? '选择要处理的文件夹'}</strong></span></button>
@@ -93,7 +93,7 @@ export function ImageTool() {
   const pickOutput = async () => { try { const path = await chooseFolder(); if (path) { setOutputDir(path); setResult(null); setMessage(''); } } catch (error) { setMessage(error instanceof Error ? error.message : '无法选择文件夹'); } };
   const convert = async () => { if (!inputPath || !outputDir) return; setPending(true); setMessage(''); try { setResult(await native.convertImage(inputPath, outputDir, format, maxDimension, quality)); } catch (error) { setMessage(error instanceof Error ? error.message : '图片处理失败'); } finally { setPending(false); } };
   return <section className="tool-screen">
-    <div className="tool-breadcrumb">图片处理 <span>/</span> 图片压缩</div>
+    <div className="tool-breadcrumb">图片工具 <span>/</span> 图片压缩</div>
     <div className="tool-titlebar"><div><h1>图片压缩</h1><p>压缩或转换 JPG、PNG 与 WebP 图片。</p></div></div>
     <div className="image-layout"><div className="image-picker"><ImageIcon size={31} /><strong>{basename(inputPath)}</strong><small>{inputPath ? '已选择图片。' : '选择一张 JPG、PNG 或 WebP 图片。'}</small><button className="secondary-button" type="button" onClick={() => void pickImage()}>选择图片</button></div><div className="image-options"><button className="path-field" type="button" onClick={() => void pickOutput()}><FolderOpen size={20} /><span><small>输出文件夹</small><strong>{outputDir ?? '选择输出位置'}</strong></span></button><label><span>输出格式</span><select value={format} onChange={(event) => setFormat(event.target.value)}><option value="jpg">JPG</option><option value="png">PNG</option><option value="webp">WebP</option></select></label><label><span>最长边　{maxDimension}px</span><input type="range" min="640" max="3840" step="160" value={maxDimension} onChange={(event) => setMaxDimension(Number(event.target.value))} /></label><label><span>JPG 质量　{quality}</span><input type="range" min="40" max="100" value={quality} onChange={(event) => setQuality(Number(event.target.value))} /></label></div></div>
     <div className="tool-footer-actions"><button className="primary-button" type="button" disabled={!inputPath || !outputDir || pending} onClick={() => void convert()}>{pending ? <LoaderCircle className="spin" size={18} /> : <ImageIcon size={18} />} 开始处理</button></div>

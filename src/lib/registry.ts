@@ -1,4 +1,4 @@
-export const CATEGORIES = ['文本与编码', '文件处理', '图片处理', '开发工具'] as const;
+export const CATEGORIES = ['图片工具', '文本工具', '文件工具', '开发工具'] as const;
 
 export type Category = (typeof CATEGORIES)[number];
 export type ToolId = 'json' | 'base64' | 'clipboard' | 'hash' | 'rename' | 'image' | 'ocr';
@@ -18,7 +18,7 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     id: 'json',
     name: 'JSON 格式化',
     description: '格式化、校验与压缩 JSON 数据',
-    category: '文本与编码',
+    category: '开发工具',
     icon: 'braces',
     keywords: ['json', '格式化', '校验', '压缩'],
   },
@@ -26,7 +26,7 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     id: 'base64',
     name: 'Base64 编解码',
     description: '在文本、Base64 与 URL 编码之间转换',
-    category: '文本与编码',
+    category: '开发工具',
     icon: 'binary',
     keywords: ['base64', '编码', '解码', 'url'],
   },
@@ -34,7 +34,7 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     id: 'clipboard',
     name: '剪贴板历史',
     description: '查找、置顶并再次复制最近的文本与链接',
-    category: '文本与编码',
+    category: '文本工具',
     icon: 'clipboard',
     keywords: ['剪贴板', '复制', '历史', '文本', '链接'],
   },
@@ -42,7 +42,7 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     id: 'hash',
     name: '文件哈希',
     description: '计算 MD5、SHA-1 与 SHA-256 校验值',
-    category: '文件处理',
+    category: '文件工具',
     icon: 'hash',
     keywords: ['hash', 'md5', 'sha1', 'sha256', '校验'],
   },
@@ -50,7 +50,7 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     id: 'rename',
     name: '批量重命名',
     description: '预览新文件名，再输出保留原文件的副本',
-    category: '文件处理',
+    category: '文件工具',
     icon: 'rename',
     keywords: ['重命名', '批量', '文件'],
   },
@@ -58,7 +58,7 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     id: 'image',
     name: '图片压缩',
     description: '压缩或转换 JPG、PNG 与 WebP 图片',
-    category: '图片处理',
+    category: '图片工具',
     icon: 'image',
     keywords: ['图片', '压缩', '转换', 'jpg', 'png', 'webp'],
   },
@@ -66,7 +66,7 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     id: 'ocr',
     name: '截图识字',
     description: '识别截图或本地图片中的中文、英文文字',
-    category: '图片处理',
+    category: '图片工具',
     icon: 'ocr',
     keywords: ['ocr', '截图', '识字', '文字识别', '图片文字'],
   },

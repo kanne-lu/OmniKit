@@ -31,7 +31,7 @@ export function CodecTool() {
   };
   return (
     <section className="tool-screen">
-      <div className="tool-breadcrumb">文本与编码 <span>/</span> Base64 编解码</div>
+      <div className="tool-breadcrumb">开发工具 <span>/</span> Base64 编解码</div>
       <div className="tool-titlebar"><div><h1>Base64 编解码</h1><p>在普通文本、Base64 与 URL 编码之间转换。</p></div></div>
       <div className="segmented-control" role="tablist" aria-label="转换方式">
         {(Object.keys(MODE_LABELS) as CodecMode[]).map((option) => <button key={option} type="button" role="tab" aria-selected={mode === option} className={mode === option ? 'is-selected' : ''} onClick={() => setMode(option)}>{MODE_LABELS[option]}</button>)}

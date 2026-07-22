@@ -94,13 +94,13 @@ export function AboutPanel() {
           <div>
             <span className="section-kicker">一站式本地工具箱</span>
             <h2>把高频的小任务，收进一个安静的工作台。</h2>
-            <p>OmniKit 为文本、文件和图片处理准备了顺手的本地工具。无需在网页、临时脚本和多个小软件之间来回切换，打开即可开始处理。</p>
+            <p>OmniKit 为文本、文件、图片和开发任务准备了顺手的本地工具。无需在网页、临时脚本和多个小软件之间来回切换，打开即可开始处理。</p>
           </div>
           <span className="about-spark" aria-hidden="true"><Sparkles size={28} /></span>
         </div>
         <div className="about-capabilities" aria-label="OmniKit 覆盖的工具类型">
-          <span><Braces size={17} /> 文本与编码</span>
-          <span><Files size={17} /> 文件处理</span>
+          <span><Braces size={17} /> 开发工具</span>
+          <span><Files size={17} /> 文件工具</span>
           <span><ImageIcon size={17} /> 图片工具</span>
         </div>
         <p className="about-note"><ShieldCheck size={19} /> 文本与文件默认不会上传到网络。</p>

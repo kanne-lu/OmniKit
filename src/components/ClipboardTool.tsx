@@ -44,7 +44,7 @@ export function ClipboardTool({ entries, isRecording, error, onRecordingChange, 
 
   return (
     <section className="tool-screen">
-      <div className="tool-breadcrumb">文本与编码 <span>/</span> 剪贴板历史</div>
+      <div className="tool-breadcrumb">文本工具 <span>/</span> 剪贴板历史</div>
       <div className="tool-titlebar">
         <div><h1>剪贴板历史</h1><p>在 OmniKit 运行期间保留复制过的文本与链接，随时再次取用。</p></div>
         <div className="tool-actions">

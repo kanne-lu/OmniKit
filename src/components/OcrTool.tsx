@@ -70,7 +70,7 @@ export function OcrTool() {
 
   return (
     <section className="tool-screen">
-      <div className="tool-breadcrumb">图片处理 <span>/</span> 截图识字</div>
+      <div className="tool-breadcrumb">图片工具 <span>/</span> 截图识字</div>
       <div className="tool-titlebar"><div><h1>截图识字</h1><p>识别截图或本地图片中的中文、英文文字，整个过程仅在本机完成。</p></div></div>
       {!desktop && <p className="desktop-only-note"><ShieldCheck size={17} /> OCR 需要 Windows 桌面版与本机已安装的 OCR 语言功能。</p>}
 

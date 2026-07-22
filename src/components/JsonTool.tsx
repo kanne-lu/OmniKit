@@ -30,7 +30,7 @@ export function JsonTool() {
 
   return (
     <section className="tool-screen json-tool">
-      <div className="tool-breadcrumb">文本与编码 <span>/</span> JSON 格式化</div>
+      <div className="tool-breadcrumb">开发工具 <span>/</span> JSON 格式化</div>
       <div className="tool-titlebar">
         <div><h1>JSON 格式化</h1><p>格式化、校验与压缩 JSON 数据</p></div>
         <button className="quiet-button" type="button" onClick={() => { setInput(''); setResult(''); setMessage('等待输入'); setIsValid(false); }}><Trash2 size={17} /> 清空</button>
