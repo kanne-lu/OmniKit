@@ -1,7 +1,7 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { Check, FileImage, FolderOpen, KeyRound, LoaderCircle, Printer, Save, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { AI_SERVICE_STORAGE_KEY, getNativeErrorMessage, parseAiServiceConfig, validateAiServiceConfig } from '../lib/aiService';
+import { AI_SERVICE_STORAGE_KEY, describeAiServiceDestination, getNativeErrorMessage, parseAiServiceConfig, validateAiServiceConfig } from '../lib/aiService';
 import { buildCopybookCells, COPYBOOK_PRESETS, countText, extractHanCharacters, type CopybookTemplate } from '../lib/education';
 import { chooseFile, chooseFolder, isDesktopRuntime, native, type AiHandwritingPreview, type AiServiceConfig, type ImageResult } from '../lib/native';
 
@@ -157,7 +157,7 @@ export function AiHandwritingRemovalTool() {
     {!desktop && <p className="desktop-only-note"><ShieldCheck size={17} /> AI 去手写需要 Windows 桌面版与用户配置的 AI 服务。</p>}
     <div className="ai-removal-layout">
       <section className="ai-removal-controls" aria-label="AI 去手写设置">
-        <div className={configError || !keyConfigured ? 'ai-config-note is-warning' : 'ai-config-note is-ready'}><KeyRound size={18} /><span><strong>{configError || !keyConfigured ? '尚未完成 AI 配置' : 'AI 服务已配置'}</strong><small>{configError || !keyConfigured ? '请前往“设置 > AI 服务”填写完整地址、模型名和密钥。' : `图片会发送至 ${config.endpoint}`}</small></span></div>
+        <div className={configError || !keyConfigured ? 'ai-config-note is-warning' : 'ai-config-note is-ready'}><KeyRound size={18} /><span><strong>{configError || !keyConfigured ? '尚未完成 AI 配置' : 'AI 服务已配置'}</strong><small>{configError || !keyConfigured ? '请前往“设置 > AI 服务”填写连接地址、模型名和密钥。' : describeAiServiceDestination(config)}</small></span></div>
         <button className="path-field" type="button" disabled={pending} onClick={() => void selectInput()}><FileImage size={21} /><span><small>输入图片</small><strong>{basename(inputPath)}</strong></span><span className="path-action">选择图片</span></button>
         <button className="path-field" type="button" disabled={pending} onClick={() => void selectOutput()}><FolderOpen size={21} /><span><small>输出文件夹</small><strong>{outputDir ?? '选择保存 AI 结果的位置'}</strong></span><span className="path-action">选择文件夹</span></button>
         <p className="ai-removal-note"><ShieldCheck size={17} /> 支持 JPG、PNG、WebP。AI 可能误改内容，请在保存前检查预览；PDF 暂不支持。</p>

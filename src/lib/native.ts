@@ -34,7 +34,9 @@ export interface OcrResult {
 }
 
 export interface AiServiceConfig {
+  connectionMode: 'direct' | 'lindon-proxy';
   endpoint: string;
+  upstreamBaseUrl: string;
   model: string;
 }
 

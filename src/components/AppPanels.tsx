@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Braces, CircleCheck, CircleHelp, Database, Download, Files, Image as ImageIcon, KeyRound, RefreshCw, Save, ShieldCheck, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
 import type { Update } from '@tauri-apps/plugin-updater';
 import { BrandMark } from './BrandMark';
-import { AI_SERVICE_STORAGE_KEY, getNativeErrorMessage, parseAiServiceConfig, validateAiServiceConfig } from '../lib/aiService';
+import { AI_SERVICE_STORAGE_KEY, getNativeErrorMessage, normalizeAiServiceConfig, parseAiServiceConfig, validateAiServiceConfig } from '../lib/aiService';
 import { isDesktopRuntime, native, type AiServiceConfig } from '../lib/native';
 import { checkForUpdate, getUpdateRuntime, installUpdate, type UpdateRuntime } from '../lib/updater';
 
@@ -39,7 +39,7 @@ export function SettingsPanel({ recentCount, favoriteCount, reducedMotion, onRed
     setAiPending(true);
     setAiMessage('');
     try {
-      const normalized = { endpoint: aiConfig.endpoint.trim(), model: aiConfig.model.trim() };
+      const normalized = normalizeAiServiceConfig(aiConfig);
       if (apiKey.trim()) {
         await native.saveAiApiKey(apiKey.trim());
         setApiKey('');
@@ -78,11 +78,14 @@ export function SettingsPanel({ recentCount, favoriteCount, reducedMotion, onRed
       <article className="settings-panel"><div className="panel-icon"><Database size={21} /></div><div><h2>本机记录</h2><p>最近使用和收藏只存储在此设备的浏览器数据中。</p></div><div className="data-actions"><button type="button" className="secondary-button" disabled={!recentCount} onClick={onClearRecent}><Trash2 size={17} /> 清空最近使用 <small>{recentCount}</small></button><button type="button" className="secondary-button" disabled={!favoriteCount} onClick={onClearFavorites}><Trash2 size={17} /> 清空收藏 <small>{favoriteCount}</small></button></div></article>
       <article className="settings-panel ai-service-panel">
         <div className="panel-icon"><KeyRound size={21} /></div>
-        <div><h2>AI 服务</h2><p>仅用于你主动发起的 AI 去手写。需兼容 OpenAI 图像编辑接口，图片会直接发送至下方地址。</p></div>
+        <div><h2>AI 服务</h2><p>仅用于你主动发起的 AI 去手写。支持直连 OpenAI 图像编辑接口，或通过已部署的 Lindon API 代理转发。</p></div>
         <div className="ai-service-form">
-          <label><span>完整 API 地址</span><input value={aiConfig.endpoint} onChange={(event) => setAiConfig((current) => ({ ...current, endpoint: event.target.value }))} placeholder="https://example.com/v1/images/edits" autoComplete="url" /></label>
+          <label><span>连接方式</span><select value={aiConfig.connectionMode} onChange={(event) => setAiConfig((current) => ({ ...current, connectionMode: event.target.value === 'lindon-proxy' ? 'lindon-proxy' : 'direct' }))}><option value="direct">直连图片编辑接口</option><option value="lindon-proxy">Lindon API 代理</option></select></label>
+          <label><span>{aiConfig.connectionMode === 'lindon-proxy' ? '代理地址' : '完整 API 地址'}</span><input value={aiConfig.endpoint} onChange={(event) => setAiConfig((current) => ({ ...current, endpoint: event.target.value }))} placeholder={aiConfig.connectionMode === 'lindon-proxy' ? 'https://example.com/api-proxy.php' : 'https://example.com/v1/images/edits'} autoComplete="url" /></label>
+          {aiConfig.connectionMode === 'lindon-proxy' && <label><span>上游 API Base URL</span><input value={aiConfig.upstreamBaseUrl} onChange={(event) => setAiConfig((current) => ({ ...current, upstreamBaseUrl: event.target.value }))} placeholder="https://api.example.com/v1" autoComplete="url" /></label>}
           <label><span>模型名</span><input value={aiConfig.model} onChange={(event) => setAiConfig((current) => ({ ...current, model: event.target.value }))} placeholder="你的图像编辑模型" autoComplete="off" /></label>
-          <label><span>API 密钥 {keyConfigured && <small>已安全保存</small>}</span><input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={keyConfigured ? '如需更换，请输入新密钥' : '输入后将保存至 Windows 凭据管理器'} autoComplete="new-password" /></label>
+          <label className="ai-key-field"><span>API 密钥 {keyConfigured && <small>已安全保存</small>}</span><input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={keyConfigured ? '如需更换，请输入新密钥' : '输入后将保存至 Windows 凭据管理器'} autoComplete="new-password" /></label>
+          {aiConfig.connectionMode === 'lindon-proxy' && <p className="ai-proxy-hint">代理模式会请求“代理地址 / images / edits”，并通过代理转发到上游 Base URL；上游地址只填写到 <code>/v1</code>，不要填写 <code>/images/edits</code>。</p>}
         </div>
         <div className="data-actions ai-service-actions"><button type="button" className="primary-button" disabled={aiPending} onClick={() => void saveAiConfiguration()}><Save size={16} /> {aiPending ? '保存中' : '保存 AI 配置'}</button><button type="button" className="secondary-button" disabled={aiPending || !keyConfigured} onClick={() => void deleteAiKey()}><Trash2 size={16} /> 删除已保存密钥</button></div>
         {aiMessage && <p className={aiMessage.includes('已') ? 'inline-success' : 'inline-error'}>{aiMessage}</p>}
