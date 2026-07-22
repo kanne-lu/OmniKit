@@ -3,10 +3,13 @@ import {
   Binary,
   Braces,
   ClipboardList,
+  Eraser,
   Files,
   Hash,
   Image,
+  NotebookPen,
   ScanText,
+  TextCursorInput,
 } from 'lucide-react';
 import type { ToolIcon } from '../lib/registry';
 
@@ -18,6 +21,9 @@ const iconByName: Record<ToolIcon, LucideIcon> = {
   rename: Files,
   image: Image,
   ocr: ScanText,
+  copybook: NotebookPen,
+  wordcount: TextCursorInput,
+  handwriting: Eraser,
 };
 
 export function ToolIconGlyph({ name, size = 22 }: { name: ToolIcon; size?: number }) {

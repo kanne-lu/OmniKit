@@ -3,6 +3,7 @@ import type { ToolDefinition, ToolId } from '../lib/registry';
 import type { ClipboardHistoryEntry } from '../lib/clipboardHistory';
 import { ClipboardTool } from './ClipboardTool';
 import { CodecTool } from './CodecTool';
+import { AiHandwritingRemovalTool, CopybookTool, WordCountTool } from './EducationTools';
 import { HashTool, ImageTool, RenameTool } from './FileTools';
 import { JsonTool } from './JsonTool';
 import { OcrTool } from './OcrTool';
@@ -44,6 +45,9 @@ export function ToolWorkspace({
     rename: <RenameTool />,
     image: <ImageTool />,
     ocr: <OcrTool />,
+    copybook: <CopybookTool />,
+    wordcount: <WordCountTool />,
+    'handwriting-removal': <AiHandwritingRemovalTool />,
   }[tool.id];
 
   return (

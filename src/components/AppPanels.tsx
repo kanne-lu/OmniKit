@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { Braces, CircleCheck, CircleHelp, Database, Download, Files, Image as ImageIcon, RefreshCw, ShieldCheck, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Braces, CircleCheck, CircleHelp, Database, Download, Files, Image as ImageIcon, KeyRound, RefreshCw, Save, ShieldCheck, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
 import type { Update } from '@tauri-apps/plugin-updater';
 import { BrandMark } from './BrandMark';
+import { AI_SERVICE_STORAGE_KEY, parseAiServiceConfig, validateAiServiceConfig } from '../lib/aiService';
+import { isDesktopRuntime, native, type AiServiceConfig } from '../lib/native';
 import { checkForUpdate, getUpdateRuntime, installUpdate, type UpdateRuntime } from '../lib/updater';
 
 interface SettingsPanelProps {
@@ -14,11 +16,77 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ recentCount, favoriteCount, reducedMotion, onReducedMotionChange, onClearRecent, onClearFavorites }: SettingsPanelProps) {
+  const desktop = isDesktopRuntime();
+  const [aiConfig, setAiConfig] = useState<AiServiceConfig>(() => parseAiServiceConfig(localStorage.getItem(AI_SERVICE_STORAGE_KEY)));
+  const [apiKey, setApiKey] = useState('');
+  const [keyConfigured, setKeyConfigured] = useState(false);
+  const [aiMessage, setAiMessage] = useState('');
+  const [aiPending, setAiPending] = useState(false);
+
+  useEffect(() => {
+    if (!desktop) return;
+    let cancelled = false;
+    void native.getAiApiKeyStatus()
+      .then((status) => { if (!cancelled) setKeyConfigured(status.configured); })
+      .catch(() => { if (!cancelled) setAiMessage('无法读取 AI 密钥状态，请在桌面版中重试。'); });
+    return () => { cancelled = true; };
+  }, [desktop]);
+
+  const saveAiConfiguration = async () => {
+    const validation = validateAiServiceConfig(aiConfig);
+    if (validation) { setAiMessage(validation); return; }
+    if (!desktop) { setAiMessage('AI 去手写仅可在 OmniKit 桌面客户端中配置。'); return; }
+    setAiPending(true);
+    setAiMessage('');
+    try {
+      const normalized = { endpoint: aiConfig.endpoint.trim(), model: aiConfig.model.trim() };
+      if (apiKey.trim()) {
+        await native.saveAiApiKey(apiKey.trim());
+        setApiKey('');
+        setKeyConfigured(true);
+      }
+      localStorage.setItem(AI_SERVICE_STORAGE_KEY, JSON.stringify(normalized));
+      setAiConfig(normalized);
+      setAiMessage(keyConfigured || apiKey.trim() ? 'AI 服务配置已保存在当前设备。' : '地址与模型已保存；请继续填写 API 密钥。');
+    } catch (error) {
+      setAiMessage(error instanceof Error ? error.message : '保存 AI 配置失败，请重试。');
+    } finally {
+      setAiPending(false);
+    }
+  };
+
+  const deleteAiKey = async () => {
+    if (!desktop) return;
+    setAiPending(true);
+    setAiMessage('');
+    try {
+      await native.deleteAiApiKey();
+      setKeyConfigured(false);
+      setApiKey('');
+      setAiMessage('已从 Windows 凭据管理器删除 API 密钥。');
+    } catch (error) {
+      setAiMessage(error instanceof Error ? error.message : '删除 API 密钥失败，请重试。');
+    } finally {
+      setAiPending(false);
+    }
+  };
+
   return <section className="info-view" aria-labelledby="settings-title">
-    <header className="info-heading"><span className="section-kicker">应用偏好</span><h1 id="settings-title">设置</h1><p>这些偏好只保存在当前设备中。</p></header>
+    <header className="info-heading"><span className="section-kicker">应用偏好</span><h1 id="settings-title">设置</h1><p>偏好保存在当前设备；AI 密钥仅保存在 Windows 凭据管理器。</p></header>
     <div className="settings-grid">
       <article className="settings-panel"><div className="panel-icon"><CircleHelp size={21} /></div><div><h2>界面反馈</h2><p>保留按钮和卡片的轻微过渡效果。</p></div><label className="switch-row"><span>减少动态效果</span><input type="checkbox" checked={reducedMotion} onChange={(event) => onReducedMotionChange(event.target.checked)} /><i aria-hidden="true" /></label></article>
       <article className="settings-panel"><div className="panel-icon"><Database size={21} /></div><div><h2>本机记录</h2><p>最近使用和收藏只存储在此设备的浏览器数据中。</p></div><div className="data-actions"><button type="button" className="secondary-button" disabled={!recentCount} onClick={onClearRecent}><Trash2 size={17} /> 清空最近使用 <small>{recentCount}</small></button><button type="button" className="secondary-button" disabled={!favoriteCount} onClick={onClearFavorites}><Trash2 size={17} /> 清空收藏 <small>{favoriteCount}</small></button></div></article>
+      <article className="settings-panel ai-service-panel">
+        <div className="panel-icon"><KeyRound size={21} /></div>
+        <div><h2>AI 服务</h2><p>仅用于你主动发起的 AI 去手写。需兼容 OpenAI 图像编辑接口，图片会直接发送至下方地址。</p></div>
+        <div className="ai-service-form">
+          <label><span>完整 API 地址</span><input value={aiConfig.endpoint} onChange={(event) => setAiConfig((current) => ({ ...current, endpoint: event.target.value }))} placeholder="https://example.com/v1/images/edits" autoComplete="url" /></label>
+          <label><span>模型名</span><input value={aiConfig.model} onChange={(event) => setAiConfig((current) => ({ ...current, model: event.target.value }))} placeholder="你的图像编辑模型" autoComplete="off" /></label>
+          <label><span>API 密钥 {keyConfigured && <small>已安全保存</small>}</span><input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={keyConfigured ? '如需更换，请输入新密钥' : '输入后将保存至 Windows 凭据管理器'} autoComplete="new-password" /></label>
+        </div>
+        <div className="data-actions ai-service-actions"><button type="button" className="primary-button" disabled={aiPending} onClick={() => void saveAiConfiguration()}><Save size={16} /> {aiPending ? '保存中' : '保存 AI 配置'}</button><button type="button" className="secondary-button" disabled={aiPending || !keyConfigured} onClick={() => void deleteAiKey()}><Trash2 size={16} /> 删除已保存密钥</button></div>
+        {aiMessage && <p className={aiMessage.includes('已') ? 'inline-success' : 'inline-error'}>{aiMessage}</p>}
+      </article>
     </div>
   </section>;
 }

@@ -33,6 +33,22 @@ export interface OcrResult {
   text: string;
 }
 
+export interface AiServiceConfig {
+  endpoint: string;
+  model: string;
+}
+
+export interface AiApiKeyStatus {
+  configured: boolean;
+}
+
+export interface AiHandwritingPreview {
+  previewPath: string;
+  bytes: number;
+  width: number;
+  height: number;
+}
+
 export function isDesktopRuntime(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
@@ -84,6 +100,13 @@ export async function readClipboardImage(): Promise<ClipboardImage> {
 
 export const native = {
   hashFile: (path: string) => invoke<HashResult>('hash_file', { path }),
+  getAiApiKeyStatus: () => invoke<AiApiKeyStatus>('get_ai_api_key_status'),
+  saveAiApiKey: (apiKey: string) => invoke<void>('save_ai_api_key', { apiKey }),
+  deleteAiApiKey: () => invoke<void>('delete_ai_api_key'),
+  previewAiHandwritingRemoval: (inputPath: string, config: AiServiceConfig) =>
+    invoke<AiHandwritingPreview>('preview_ai_handwriting_removal', { inputPath, config }),
+  saveAiHandwritingResult: (previewPath: string, inputPath: string, outputDir: string) =>
+    invoke<ImageResult>('save_ai_handwriting_result', { previewPath, inputPath, outputDir }),
   previewRename: (inputDir: string, outputDir: string, prefix: string, startNumber: number, separator: string) =>
     invoke<RenamePreviewItem[]>('preview_rename', { inputDir, outputDir, prefix, startNumber, separator }),
   copyRenamedFiles: (inputDir: string, outputDir: string, prefix: string, startNumber: number, separator: string) =>

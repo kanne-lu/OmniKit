@@ -1,8 +1,8 @@
-export const CATEGORIES = ['图片工具', '文本工具', '文件工具', '开发工具'] as const;
+export const CATEGORIES = ['图片工具', '文本工具', '文件工具', '开发工具', '教育工具'] as const;
 
 export type Category = (typeof CATEGORIES)[number];
-export type ToolId = 'json' | 'base64' | 'clipboard' | 'hash' | 'rename' | 'image' | 'ocr';
-export type ToolIcon = 'braces' | 'binary' | 'clipboard' | 'hash' | 'rename' | 'image' | 'ocr';
+export type ToolId = 'json' | 'base64' | 'clipboard' | 'hash' | 'rename' | 'image' | 'ocr' | 'copybook' | 'wordcount' | 'handwriting-removal';
+export type ToolIcon = 'braces' | 'binary' | 'clipboard' | 'hash' | 'rename' | 'image' | 'ocr' | 'copybook' | 'wordcount' | 'handwriting';
 
 export interface ToolDefinition {
   id: ToolId;
@@ -69,6 +69,30 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     category: '图片工具',
     icon: 'ocr',
     keywords: ['ocr', '截图', '识字', '文字识别', '图片文字'],
+  },
+  {
+    id: 'copybook',
+    name: '手写字帖生成',
+    description: '输入汉字，生成可打印的练字格纸',
+    category: '教育工具',
+    icon: 'copybook',
+    keywords: ['字帖', '练字', '书写', '田字格', '米字格'],
+  },
+  {
+    id: 'wordcount',
+    name: '字数计算',
+    description: '统计文本总字数、汉字与英文单词',
+    category: '教育工具',
+    icon: 'wordcount',
+    keywords: ['字数', '统计', '汉字', '单词', '字符'],
+  },
+  {
+    id: 'handwriting-removal',
+    name: 'AI 去手写',
+    description: '使用你配置的 AI 服务清理手写批注',
+    category: '教育工具',
+    icon: 'handwriting',
+    keywords: ['去手写', '手写擦除', '试卷', '批注', 'ai'],
   },
 ];
 

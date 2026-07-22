@@ -2,6 +2,7 @@ import {
   Clock3,
   Code2,
   Files,
+  GraduationCap,
   Grid2X2,
   Image,
   Info,
@@ -26,6 +27,7 @@ const categoryIcons = {
   '文本工具': Text,
   '文件工具': Files,
   '开发工具': Code2,
+  '教育工具': GraduationCap,
 } satisfies Record<Category, typeof Code2>;
 
 export function Sidebar({ activeView, activeCategory, onCategoryChange, onNavigate }: SidebarProps) {

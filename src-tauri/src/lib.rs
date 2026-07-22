@@ -1,14 +1,18 @@
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
 use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader, RgbaImage};
+use keyring::Entry;
 use md5::{Digest as Md5Digest, Md5};
-use serde::Serialize;
+use reqwest::{redirect::Policy, Client, Url};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha1::Sha1;
 use sha2::Sha256;
 use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,6 +45,241 @@ struct ImageResult {
 #[serde(rename_all = "camelCase")]
 struct OcrResult {
     text: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AiServiceConfig {
+    endpoint: String,
+    model: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AiApiKeyStatus {
+    configured: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AiHandwritingPreview {
+    preview_path: String,
+    bytes: u64,
+    width: u32,
+    height: u32,
+}
+
+enum AiImageSource {
+    Base64(String),
+    Url(Url),
+}
+
+const AI_SECRET_SERVICE: &str = "OmniKit";
+const AI_SECRET_ACCOUNT: &str = "ai-image-edit-api-key";
+const AI_HANDWRITING_PROMPT: &str = "Remove handwritten annotations, notes, marks, and answers from this worksheet while preserving all printed text, layout, tables, lines, illustrations, and paper background. Return a clean, faithful worksheet image only.";
+
+fn ai_api_key_entry() -> Result<Entry, String> {
+    Entry::new(AI_SECRET_SERVICE, AI_SECRET_ACCOUNT)
+        .map_err(|error| format!("无法访问 Windows 凭据管理器：{error}"))
+}
+
+fn read_ai_api_key() -> Result<String, String> {
+    let key = ai_api_key_entry()?
+        .get_password()
+        .map_err(|_| "尚未配置 AI 服务密钥，请先前往设置保存。".to_owned())?;
+    if key.trim().is_empty() {
+        return Err("尚未配置 AI 服务密钥，请先前往设置保存。".to_owned());
+    }
+    Ok(key)
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    host.eq_ignore_ascii_case("localhost") || host == "127.0.0.1" || host == "::1"
+}
+
+fn validate_ai_service_config(config: &AiServiceConfig) -> Result<Url, String> {
+    if config.model.trim().is_empty() {
+        return Err("请填写 AI 模型名".to_owned());
+    }
+    let endpoint = Url::parse(config.endpoint.trim()).map_err(|_| "API 地址格式无效".to_owned())?;
+    if !endpoint.username().is_empty() || endpoint.password().is_some() {
+        return Err("API 地址中不能包含账号或密钥".to_owned());
+    }
+    match endpoint.scheme() {
+        "https" => Ok(endpoint),
+        "http" if endpoint.host_str().is_some_and(is_loopback_host) => Ok(endpoint),
+        "http" => Err("API 地址必须使用 HTTPS；本机调试服务可使用 localhost".to_owned()),
+        _ => Err("API 地址必须使用 HTTPS".to_owned()),
+    }
+}
+
+fn supported_ai_image_mime(path: &Path) -> Result<&'static str, String> {
+    match path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("jpg" | "jpeg") => Ok("image/jpeg"),
+        Some("png") => Ok("image/png"),
+        Some("webp") => Ok("image/webp"),
+        _ => Err("AI 去手写仅支持 JPG、PNG 或 WebP 图片".to_owned()),
+    }
+}
+
+fn extract_ai_image_source(response: &Value) -> Result<AiImageSource, String> {
+    let item = response
+        .get("data")
+        .and_then(Value::as_array)
+        .and_then(|items| items.first())
+        .ok_or_else(|| "AI 服务返回格式不兼容：缺少图片结果".to_owned())?;
+
+    if let Some(value) = item.get("b64_json").and_then(Value::as_str).filter(|value| !value.trim().is_empty()) {
+        return Ok(AiImageSource::Base64(value.to_owned()));
+    }
+
+    if let Some(value) = item.get("url").and_then(Value::as_str).filter(|value| !value.trim().is_empty()) {
+        let url = Url::parse(value).map_err(|_| "AI 服务返回的图片地址无效".to_owned())?;
+        if url.scheme() != "https" {
+            return Err("AI 服务返回的图片地址必须使用 HTTPS".to_owned());
+        }
+        return Ok(AiImageSource::Url(url));
+    }
+
+    Err("AI 服务返回格式不兼容：未找到图片内容".to_owned())
+}
+
+fn describe_ai_http_error(status: reqwest::StatusCode) -> String {
+    match status.as_u16() {
+        401 | 403 => "AI 服务认证失败，请检查 API 地址和密钥。".to_owned(),
+        408 | 504 => "AI 服务处理超时，请稍后重试。".to_owned(),
+        413 => "图片文件过大，AI 服务拒绝处理。".to_owned(),
+        429 => "AI 服务请求过于频繁或额度不足，请稍后重试。".to_owned(),
+        status => format!("AI 服务请求失败（HTTP {status}）。"),
+    }
+}
+
+fn ai_http_client() -> Result<Client, String> {
+    Client::builder()
+        .timeout(Duration::from_secs(120))
+        .redirect(Policy::none())
+        .build()
+        .map_err(|error| format!("无法初始化 AI 网络连接：{error}"))
+}
+
+fn temporary_ai_preview_path() -> PathBuf {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "omnikit-ai-handwriting-preview-{}-{timestamp}.png",
+        std::process::id()
+    ))
+}
+
+fn is_ai_preview_path(path: &Path) -> bool {
+    path.parent() == Some(std::env::temp_dir().as_path())
+        && path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| value.starts_with("omnikit-ai-handwriting-preview-"))
+}
+
+fn write_ai_preview(bytes: &[u8]) -> Result<AiHandwritingPreview, String> {
+    let image = image::load_from_memory(bytes)
+        .map_err(|_| "AI 服务返回的内容不是可用图片".to_owned())?;
+    let preview_path = temporary_ai_preview_path();
+    image
+        .save_with_format(&preview_path, ImageFormat::Png)
+        .map_err(|error| format!("无法准备 AI 结果预览：{error}"))?;
+    let metadata = fs::metadata(&preview_path)
+        .map_err(|error| format!("无法读取 AI 结果预览：{error}"))?;
+    Ok(AiHandwritingPreview {
+        preview_path: preview_path.to_string_lossy().to_string(),
+        bytes: metadata.len(),
+        width: image.width(),
+        height: image.height(),
+    })
+}
+
+async fn request_ai_handwriting_preview(
+    input_path: String,
+    config: AiServiceConfig,
+) -> Result<AiHandwritingPreview, String> {
+    let endpoint = validate_ai_service_config(&config)?;
+    let api_key = read_ai_api_key()?;
+    let source = PathBuf::from(&input_path);
+    let mime = supported_ai_image_mime(&source)?;
+    let source_bytes = fs::read(&source).map_err(|error| format!("无法读取图片：{error}"))?;
+    ImageReader::open(&source)
+        .map_err(|error| format!("无法打开图片：{error}"))?
+        .decode()
+        .map_err(|error| format!("无法读取图片：{error}"))?;
+    let filename = source
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("worksheet")
+        .to_owned();
+    let image_part = reqwest::multipart::Part::bytes(source_bytes)
+        .file_name(filename)
+        .mime_str(mime)
+        .map_err(|error| format!("无法准备 AI 图片请求：{error}"))?;
+    let form = reqwest::multipart::Form::new()
+        .text("model", config.model.trim().to_owned())
+        .text("prompt", AI_HANDWRITING_PROMPT)
+        .part("image", image_part);
+    let client = ai_http_client()?;
+    let response = client
+        .post(endpoint)
+        .bearer_auth(api_key)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|error| {
+            if error.is_timeout() {
+                "AI 服务处理超时，请稍后重试。".to_owned()
+            } else {
+                "无法连接 AI 服务，请检查 API 地址和网络。".to_owned()
+            }
+        })?;
+    if !response.status().is_success() {
+        return Err(describe_ai_http_error(response.status()));
+    }
+    let payload = response
+        .json::<Value>()
+        .await
+        .map_err(|_| "AI 服务返回格式不兼容：无法读取结果。".to_owned())?;
+    let image_bytes = match extract_ai_image_source(&payload)? {
+        AiImageSource::Base64(value) => BASE64_STANDARD
+            .decode(value.trim())
+            .map_err(|_| "AI 服务返回的图片内容无效".to_owned())?,
+        AiImageSource::Url(url) => {
+            let response = client
+                .get(url)
+                .send()
+                .await
+                .map_err(|_| "无法下载 AI 返回的图片结果。".to_owned())?;
+            if !response.status().is_success() {
+                return Err("无法下载 AI 返回的图片结果。".to_owned());
+            }
+            response
+                .bytes()
+                .await
+                .map_err(|_| "无法读取 AI 返回的图片结果。".to_owned())?
+                .to_vec()
+        }
+    };
+    write_ai_preview(&image_bytes)
+}
+
+fn build_ai_output_path(input_path: &Path, output_dir: &Path) -> PathBuf {
+    let stem = input_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("worksheet");
+    output_dir.join(format!("{stem}-AI去手写.png"))
 }
 
 fn hash_file_contents(path: &Path) -> Result<HashResult, String> {
@@ -357,6 +596,77 @@ fn hash_file(path: String) -> Result<HashResult, String> {
 }
 
 #[tauri::command]
+fn get_ai_api_key_status() -> Result<AiApiKeyStatus, String> {
+    let configured = ai_api_key_entry()?.get_password().is_ok();
+    Ok(AiApiKeyStatus { configured })
+}
+
+#[tauri::command]
+fn save_ai_api_key(api_key: String) -> Result<(), String> {
+    if api_key.trim().is_empty() {
+        return Err("API 密钥不能为空".to_owned());
+    }
+    ai_api_key_entry()?
+        .set_password(api_key.trim())
+        .map_err(|error| format!("无法安全保存 API 密钥：{error}"))
+}
+
+#[tauri::command]
+fn delete_ai_api_key() -> Result<(), String> {
+    let entry = ai_api_key_entry()?;
+    if entry.get_password().is_err() {
+        return Ok(());
+    }
+    entry
+        .delete_credential()
+        .map_err(|error| format!("无法删除 API 密钥：{error}"))
+}
+
+#[tauri::command]
+async fn preview_ai_handwriting_removal(
+    input_path: String,
+    config: AiServiceConfig,
+) -> Result<AiHandwritingPreview, String> {
+    request_ai_handwriting_preview(input_path, config).await
+}
+
+#[tauri::command]
+fn save_ai_handwriting_result(
+    preview_path: String,
+    input_path: String,
+    output_dir: String,
+) -> Result<ImageResult, String> {
+    let preview_path = PathBuf::from(preview_path);
+    if !is_ai_preview_path(&preview_path) || !preview_path.is_file() {
+        return Err("AI 结果预览已失效，请重新处理图片。".to_owned());
+    }
+    let output_dir = PathBuf::from(output_dir);
+    if !output_dir.is_dir() {
+        return Err("请选择有效的输出文件夹".to_owned());
+    }
+    let output_path = build_ai_output_path(Path::new(&input_path), &output_dir);
+    if output_path.exists() {
+        return Err("输出文件已存在，请更换输出文件夹或先移动旧文件。".to_owned());
+    }
+    let image = ImageReader::open(&preview_path)
+        .map_err(|error| format!("无法读取 AI 结果预览：{error}"))?
+        .decode()
+        .map_err(|error| format!("无法读取 AI 结果预览：{error}"))?;
+    image
+        .save_with_format(&output_path, ImageFormat::Png)
+        .map_err(|error| format!("无法保存 AI 去手写结果：{error}"))?;
+    let metadata = fs::metadata(&output_path)
+        .map_err(|error| format!("无法读取输出文件：{error}"))?;
+    let _ = fs::remove_file(preview_path);
+    Ok(ImageResult {
+        output_path: output_path.to_string_lossy().to_string(),
+        bytes: metadata.len(),
+        width: image.width(),
+        height: image.height(),
+    })
+}
+
+#[tauri::command]
 fn preview_rename(
     input_dir: String,
     output_dir: String,
@@ -517,6 +827,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             hash_file,
+            get_ai_api_key_status,
+            save_ai_api_key,
+            delete_ai_api_key,
+            preview_ai_handwriting_removal,
+            save_ai_handwriting_result,
             preview_rename,
             copy_renamed_files,
             convert_image,
@@ -531,7 +846,9 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        expected_rgba_bytes, ocr_preprocess_dimensions, reconstruct_ocr_line, winrt_storage_path,
+        build_ai_output_path, describe_ai_http_error, expected_rgba_bytes, extract_ai_image_source,
+        ocr_preprocess_dimensions, reconstruct_ocr_line, supported_ai_image_mime,
+        validate_ai_service_config, winrt_storage_path, AiImageSource, AiServiceConfig,
     };
     use std::path::Path;
 
@@ -573,5 +890,69 @@ mod tests {
             reconstruct_ocr_line(&["你好", "，", "OmniKit", "！"]),
             "你好，OmniKit！"
         );
+    }
+
+    #[test]
+    fn accepts_https_and_localhost_ai_endpoints_only() {
+        let https = AiServiceConfig {
+            endpoint: "https://example.com/v1/images/edits".to_owned(),
+            model: "image-model".to_owned(),
+        };
+        assert!(validate_ai_service_config(&https).is_ok());
+
+        let local = AiServiceConfig {
+            endpoint: "http://localhost:8080/v1/images/edits".to_owned(),
+            model: "image-model".to_owned(),
+        };
+        assert!(validate_ai_service_config(&local).is_ok());
+
+        let unsafe_remote = AiServiceConfig {
+            endpoint: "http://example.com/v1/images/edits".to_owned(),
+            model: "image-model".to_owned(),
+        };
+        assert!(validate_ai_service_config(&unsafe_remote).is_err());
+    }
+
+    #[test]
+    fn rejects_empty_model_and_non_image_sources() {
+        let missing_model = AiServiceConfig {
+            endpoint: "https://example.com/v1/images/edits".to_owned(),
+            model: " ".to_owned(),
+        };
+        assert!(validate_ai_service_config(&missing_model).is_err());
+        assert!(supported_ai_image_mime(Path::new("worksheet.pdf")).is_err());
+        assert_eq!(supported_ai_image_mime(Path::new("worksheet.PNG")), Ok("image/png"));
+    }
+
+    #[test]
+    fn parses_base64_or_https_url_image_results() {
+        let base64 = serde_json::json!({ "data": [{ "b64_json": "aGVsbG8=" }] });
+        assert!(matches!(
+            extract_ai_image_source(&base64),
+            Ok(AiImageSource::Base64(value)) if value == "aGVsbG8="
+        ));
+
+        let url = serde_json::json!({ "data": [{ "url": "https://cdn.example.com/result.png" }] });
+        assert!(matches!(
+            extract_ai_image_source(&url),
+            Ok(AiImageSource::Url(value)) if value.as_str() == "https://cdn.example.com/result.png"
+        ));
+
+        let unsafe_url = serde_json::json!({ "data": [{ "url": "http://cdn.example.com/result.png" }] });
+        assert!(extract_ai_image_source(&unsafe_url).is_err());
+    }
+
+    #[test]
+    fn creates_a_non_destructive_ai_output_name() {
+        assert_eq!(
+            build_ai_output_path(Path::new(r"C:\\input\\试卷.jpg"), Path::new(r"D:\\output")),
+            Path::new(r"D:\\output\\试卷-AI去手写.png")
+        );
+    }
+
+    #[test]
+    fn maps_provider_errors_without_returning_provider_body() {
+        assert_eq!(describe_ai_http_error(reqwest::StatusCode::UNAUTHORIZED), "AI 服务认证失败，请检查 API 地址和密钥。");
+        assert_eq!(describe_ai_http_error(reqwest::StatusCode::TOO_MANY_REQUESTS), "AI 服务请求过于频繁或额度不足，请稍后重试。");
     }
 }
