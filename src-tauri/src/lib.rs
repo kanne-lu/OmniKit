@@ -1,6 +1,6 @@
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
-use image::{ImageFormat, ImageReader, RgbaImage};
+use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader, RgbaImage};
 use md5::{Digest as Md5Digest, Md5};
 use serde::Serialize;
 use sha1::Sha1;
@@ -134,6 +134,82 @@ fn expected_rgba_bytes(width: u32, height: u32) -> Result<usize, String> {
     usize::try_from(bytes).map_err(|_| "截图尺寸过大，无法识别".to_owned())
 }
 
+const OCR_MAX_EDGE: u32 = 4096;
+const OCR_CONTRAST: f32 = 20.0;
+
+fn ocr_preprocess_dimensions(width: u32, height: u32) -> (u32, u32) {
+    let longest_edge = width.max(height);
+    if longest_edge == 0 {
+        return (0, 0);
+    }
+
+    let target_longest_edge = longest_edge.saturating_mul(2).min(OCR_MAX_EDGE);
+    let scale = u64::from(target_longest_edge);
+    let source_longest_edge = u64::from(longest_edge);
+    let scaled_width = ((u64::from(width) * scale + source_longest_edge / 2) / source_longest_edge)
+        .max(1) as u32;
+    let scaled_height = ((u64::from(height) * scale + source_longest_edge / 2) / source_longest_edge)
+        .max(1) as u32;
+    (scaled_width, scaled_height)
+}
+
+fn prepare_image_for_ocr(image: DynamicImage) -> DynamicImage {
+    let (width, height) = image.dimensions();
+    let (target_width, target_height) = ocr_preprocess_dimensions(width, height);
+    image
+        .resize_exact(target_width, target_height, FilterType::Lanczos3)
+        .grayscale()
+        .adjust_contrast(OCR_CONTRAST)
+}
+
+fn is_cjk_character(character: char) -> bool {
+    matches!(character,
+        '\u{3400}'..='\u{4DBF}'
+        | '\u{4E00}'..='\u{9FFF}'
+        | '\u{F900}'..='\u{FAFF}'
+        | '\u{3040}'..='\u{30FF}'
+        | '\u{AC00}'..='\u{D7AF}'
+    )
+}
+
+fn is_cjk_word(word: &str) -> bool {
+    !word.is_empty() && word.chars().all(is_cjk_character)
+}
+
+fn is_closing_punctuation(word: &str) -> bool {
+    matches!(word, "," | "." | "!" | "?" | ";" | ":" | "，" | "。" | "！" | "？" | "；" | "：" | "、" | "）" | "】" | "》" | "」" | "』")
+}
+
+fn is_opening_punctuation(word: &str) -> bool {
+    matches!(word, "(" | "[" | "{" | "（" | "【" | "《" | "「" | "『")
+}
+
+fn is_cjk_closing_punctuation(word: &str) -> bool {
+    matches!(word, "，" | "。" | "！" | "？" | "；" | "：" | "、" | "）" | "】" | "》" | "」" | "』")
+}
+
+fn reconstruct_ocr_line(words: &[&str]) -> String {
+    let mut text = String::new();
+    let mut previous_word = None;
+
+    for word in words.iter().map(|word| word.trim()).filter(|word| !word.is_empty()) {
+        if let Some(previous) = previous_word {
+            let joins_cjk = is_cjk_word(previous) && is_cjk_word(word);
+            if !joins_cjk
+                && !is_closing_punctuation(word)
+                && !is_opening_punctuation(previous)
+                && !is_cjk_closing_punctuation(previous)
+            {
+                text.push(' ');
+            }
+        }
+        text.push_str(word);
+        previous_word = Some(word);
+    }
+
+    text
+}
+
 fn winrt_storage_path(path: &Path) -> String {
     let path = path.to_string_lossy();
     path.strip_prefix(r"\\?\").unwrap_or(&path).to_owned()
@@ -158,6 +234,49 @@ fn create_ocr_engine() -> Result<windows::Media::Ocr::OcrEngine, String> {
     OcrEngine::TryCreateFromUserProfileLanguages().map_err(|_| {
         "Windows 未提供可用的 OCR 语言。请在“设置 > 时间和语言 > 语言和区域”中安装中文或英文的 OCR 功能后重试。".to_owned()
     })
+}
+
+#[cfg(target_os = "windows")]
+fn reconstruct_windows_ocr_result(result: &windows::Media::Ocr::OcrResult) -> Result<String, String> {
+    let lines = result
+        .Lines()
+        .map_err(|error| format!("无法读取识别行：{error}"))?;
+    let mut reconstructed_lines = Vec::new();
+
+    for line_index in 0..lines.Size().map_err(|error| format!("无法读取识别行：{error}"))? {
+        let line = lines
+            .GetAt(line_index)
+            .map_err(|error| format!("无法读取识别行：{error}"))?;
+        let words = line
+            .Words()
+            .map_err(|error| format!("无法读取识别词：{error}"))?;
+        let mut text = Vec::new();
+
+        for word_index in 0..words.Size().map_err(|error| format!("无法读取识别词：{error}"))? {
+            let word = words
+                .GetAt(word_index)
+                .map_err(|error| format!("无法读取识别词：{error}"))?;
+            text.push(
+                word.Text()
+                    .map_err(|error| format!("无法读取识别词：{error}"))?
+                    .to_string(),
+            );
+        }
+
+        let tokens = text.iter().map(String::as_str).collect::<Vec<_>>();
+        let line_text = reconstruct_ocr_line(&tokens);
+        if !line_text.is_empty() {
+            reconstructed_lines.push(line_text);
+        }
+    }
+
+    if reconstructed_lines.is_empty() {
+        return result
+            .Text()
+            .map(|text| text.to_string())
+            .map_err(|error| format!("无法读取识别结果：{error}"));
+    }
+    Ok(reconstructed_lines.join("\n"))
 }
 
 #[cfg(target_os = "windows")]
@@ -198,10 +317,7 @@ fn recognize_windows_image(path: &Path) -> Result<String, String> {
         .map_err(|error| format!("无法开始文字识别：{error}"))?
         .get()
         .map_err(|error| format!("文字识别失败：{error}"))?;
-    let text = result
-        .Text()
-        .map_err(|error| format!("无法读取识别结果：{error}"))?
-        .to_string();
+    let text = reconstruct_windows_ocr_result(&result)?;
 
     if text.trim().is_empty() {
         return Err("没有识别到可复制的文字，请换一张更清晰的图片".to_owned());
@@ -223,6 +339,16 @@ fn temporary_ocr_image_path() -> PathBuf {
         "omnikit-ocr-{}-{timestamp}.png",
         std::process::id()
     ))
+}
+
+fn recognize_preprocessed_image(image: DynamicImage) -> Result<String, String> {
+    let path = temporary_ocr_image_path();
+    let result = prepare_image_for_ocr(image)
+        .save_with_format(&path, ImageFormat::Png)
+        .map_err(|error| format!("无法准备 OCR 图片：{error}"))
+        .and_then(|_| recognize_windows_image(&path));
+    let _ = fs::remove_file(&path);
+    result
 }
 
 #[tauri::command]
@@ -349,7 +475,11 @@ where
 #[tauri::command]
 async fn recognize_image_file(path: String) -> Result<OcrResult, String> {
     run_ocr_in_background(move || {
-        recognize_windows_image(Path::new(&path)).map(|text| OcrResult { text })
+        let image = ImageReader::open(&path)
+            .map_err(|error| format!("无法打开图片：{error}"))?
+            .decode()
+            .map_err(|error| format!("无法读取图片：{error}"))?;
+        recognize_preprocessed_image(image).map(|text| OcrResult { text })
     })
     .await
 }
@@ -368,13 +498,7 @@ async fn recognize_clipboard_image(
 
         let image = RgbaImage::from_raw(width, height, bytes)
             .ok_or_else(|| "无法读取截图数据，请重新截图后再试".to_owned())?;
-        let path = temporary_ocr_image_path();
-        image
-            .save_with_format(&path, ImageFormat::Png)
-            .map_err(|error| format!("无法准备截图：{error}"))?;
-        let result = recognize_windows_image(&path);
-        let _ = fs::remove_file(&path);
-        result.map(|text| OcrResult { text })
+        recognize_preprocessed_image(DynamicImage::ImageRgba8(image)).map(|text| OcrResult { text })
     })
     .await
 }
@@ -406,7 +530,9 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{expected_rgba_bytes, winrt_storage_path};
+    use super::{
+        expected_rgba_bytes, ocr_preprocess_dimensions, reconstruct_ocr_line, winrt_storage_path,
+    };
     use std::path::Path;
 
     #[test]
@@ -425,5 +551,27 @@ mod tests {
     #[test]
     fn rejects_zero_sized_images() {
         assert!(expected_rgba_bytes(0, 120).is_err());
+    }
+
+    #[test]
+    fn enlarges_small_images_and_caps_large_ones_for_ocr() {
+        assert_eq!(ocr_preprocess_dimensions(960, 540), (1920, 1080));
+        assert_eq!(ocr_preprocess_dimensions(6000, 2000), (4096, 1365));
+    }
+
+    #[test]
+    fn rebuilds_cjk_ocr_words_without_spurious_spaces() {
+        assert_eq!(
+            reconstruct_ocr_line(&["OmniKit", "工", "作", "台", "SHA256", "校验"]),
+            "OmniKit 工作台 SHA256 校验"
+        );
+    }
+
+    #[test]
+    fn preserves_punctuation_when_rebuilding_ocr_words() {
+        assert_eq!(
+            reconstruct_ocr_line(&["你好", "，", "OmniKit", "！"]),
+            "你好，OmniKit！"
+        );
     }
 }
