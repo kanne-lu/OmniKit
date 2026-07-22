@@ -2,8 +2,17 @@ import { Check, ClipboardPaste, Copy, FileImage, LoaderCircle, ScanText, ShieldC
 import { useState } from 'react';
 import { chooseFile, isDesktopRuntime, native, readClipboardImage, writeClipboardText } from '../lib/native';
 
+function getOcrErrorDetail(error: unknown): string {
+  if (error instanceof Error) return error.message.trim();
+  if (typeof error === 'string') return error.trim();
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    return error.message.trim();
+  }
+  return String(error ?? '').trim();
+}
+
 function describeOcrError(error: unknown, source: 'clipboard' | 'file'): string {
-  const detail = error instanceof Error ? error.message.trim() : '';
+  const detail = getOcrErrorDetail(error);
   if (/clipboard-manager|permission|not allowed/i.test(detail)) {
     return '无法读取系统剪贴板图片。请重启更新后的 OmniKit 后，再使用 Win + Shift + S 截图。';
   }
@@ -28,6 +37,7 @@ export function OcrTool() {
       setSource(sourceName);
       setResult(next.text);
     } catch (error) {
+      console.error('[OmniKit OCR] recognition failed', error);
       setMessage(describeOcrError(error, sourceKind));
     } finally {
       setPending(false);
