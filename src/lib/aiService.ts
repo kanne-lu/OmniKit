@@ -3,22 +3,40 @@ import type { AiServiceConfig } from './native';
 export const AI_SERVICE_STORAGE_KEY = 'omnikit.v1.ai-service';
 
 export const EMPTY_AI_SERVICE_CONFIG: AiServiceConfig = {
-  connectionMode: 'direct',
   endpoint: '',
-  upstreamBaseUrl: '',
   model: '',
 };
+
+interface LegacyAiServiceConfig extends Partial<AiServiceConfig> {
+  connectionMode?: unknown;
+  upstreamBaseUrl?: unknown;
+}
+
+function migrateLegacyEndpoint(candidate: LegacyAiServiceConfig): string {
+  const endpoint = typeof candidate.endpoint === 'string' ? candidate.endpoint : '';
+  if (candidate.connectionMode !== 'lindon-proxy' || typeof candidate.upstreamBaseUrl !== 'string' || !candidate.upstreamBaseUrl.trim()) {
+    return endpoint;
+  }
+  try {
+    const upstream = new URL(candidate.upstreamBaseUrl.trim());
+    const path = upstream.pathname.replace(/\/+$/, '');
+    if (!/\/images\/edits$/i.test(path)) upstream.pathname = `${path}/images/edits`;
+    upstream.search = '';
+    upstream.hash = '';
+    return upstream.toString();
+  } catch {
+    return endpoint;
+  }
+}
 
 export function parseAiServiceConfig(value: string | null): AiServiceConfig {
   if (!value) return { ...EMPTY_AI_SERVICE_CONFIG };
   try {
     const parsed: unknown = JSON.parse(value);
     if (!parsed || typeof parsed !== 'object') return { ...EMPTY_AI_SERVICE_CONFIG };
-    const candidate = parsed as Partial<AiServiceConfig>;
+    const candidate = parsed as LegacyAiServiceConfig;
     return {
-      connectionMode: candidate.connectionMode === 'lindon-proxy' ? 'lindon-proxy' : 'direct',
-      endpoint: typeof candidate.endpoint === 'string' ? candidate.endpoint : '',
-      upstreamBaseUrl: typeof candidate.upstreamBaseUrl === 'string' ? candidate.upstreamBaseUrl : '',
+      endpoint: migrateLegacyEndpoint(candidate),
       model: typeof candidate.model === 'string' ? candidate.model : '',
     };
   } catch {
@@ -42,9 +60,7 @@ function validateHttpUrl(value: string, label: string): URL | string {
 
 export function normalizeAiServiceConfig(config: AiServiceConfig): AiServiceConfig {
   return {
-    connectionMode: config.connectionMode === 'lindon-proxy' ? 'lindon-proxy' : 'direct',
     endpoint: config.endpoint.trim(),
-    upstreamBaseUrl: config.upstreamBaseUrl.trim(),
     model: config.model.trim(),
   };
 }
@@ -52,33 +68,17 @@ export function normalizeAiServiceConfig(config: AiServiceConfig): AiServiceConf
 export function validateAiServiceConfig(config: AiServiceConfig): string | null {
   if (!config.endpoint.trim()) return '请填写完整 API 地址。';
   if (!config.model.trim()) return '请填写 AI 模型名。';
-  const endpointLabel = config.connectionMode === 'lindon-proxy' ? '代理地址' : 'API 地址';
-  const endpoint = validateHttpUrl(config.endpoint, endpointLabel);
+  const endpoint = validateHttpUrl(config.endpoint, 'API 地址');
   if (typeof endpoint === 'string') return endpoint;
 
   const pathname = endpoint.pathname.replace(/\/+$/, '');
-  if (config.connectionMode === 'direct') {
-    if (!/\/images\/edits$/i.test(pathname)) {
-      return '请填写图像编辑完整地址，例如 https://example.com/v1/images/edits。';
-    }
-    return null;
+  if (!/\/images\/edits$/i.test(pathname)) {
+    return '请填写图像编辑完整地址，例如 https://example.com/v1/images/edits。';
   }
-
-  if (!config.upstreamBaseUrl.trim()) return '请填写上游 API Base URL。';
-  const upstream = validateHttpUrl(config.upstreamBaseUrl, '上游 API Base URL');
-  if (typeof upstream === 'string') return upstream;
-  const upstreamPath = upstream.pathname.replace(/\/+$/, '');
-  if (/\/(?:images|responses)(?:\/|$)/i.test(upstreamPath)) {
-    return '上游地址应填写 Base URL，例如 https://example.com/v1，不能填写具体接口路径。';
-  }
-
   return null;
 }
 
 export function describeAiServiceDestination(config: AiServiceConfig): string {
-  if (config.connectionMode === 'lindon-proxy') {
-    return `图片会先发送至 ${config.endpoint}，再由代理转发到 ${config.upstreamBaseUrl}。`;
-  }
   return `图片会直接发送至 ${config.endpoint}。`;
 }
 

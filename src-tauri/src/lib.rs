@@ -47,22 +47,10 @@ struct OcrResult {
     text: String,
 }
 
-#[derive(Deserialize, Clone, Copy, Default, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-enum AiConnectionMode {
-    #[default]
-    Direct,
-    LindonProxy,
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AiServiceConfig {
-    #[serde(default)]
-    connection_mode: AiConnectionMode,
     endpoint: String,
-    #[serde(default)]
-    upstream_base_url: String,
     model: String,
 }
 
@@ -84,11 +72,6 @@ struct AiHandwritingPreview {
 enum AiImageSource {
     Base64(String),
     Url(Url),
-}
-
-struct AiRequestTarget {
-    endpoint: Url,
-    upstream_base_url: Option<String>,
 }
 
 const AI_SECRET_SERVICE: &str = "OmniKit";
@@ -129,87 +112,21 @@ fn validate_ai_url(value: &str, label: &str) -> Result<Url, String> {
     }
 }
 
-fn append_lindon_proxy_edit_path(mut endpoint: Url) -> Result<Url, String> {
-    if endpoint.query().is_some() || endpoint.fragment().is_some() {
-        return Err("代理地址不能包含查询参数或片段".to_owned());
-    }
-    let path = endpoint.path().trim_end_matches('/');
-    endpoint.set_path(&format!("{path}/images/edits"));
-    Ok(endpoint)
-}
-
-fn normalize_lindon_upstream_base_url(value: &str) -> Result<String, String> {
-    let mut upstream = validate_ai_url(value, "上游 API Base URL")?;
-    if upstream.query().is_some() || upstream.fragment().is_some() {
-        return Err("上游 API Base URL不能包含查询参数或片段".to_owned());
-    }
-
-    let segments = upstream
-        .path_segments()
-        .map(|items| items.filter(|item| !item.is_empty()).collect::<Vec<_>>())
-        .unwrap_or_default();
-    let mut normalized = Vec::new();
-    if let Some(v1_index) = segments
-        .iter()
-        .position(|item| item.eq_ignore_ascii_case("v1"))
-    {
-        if segments.len() != v1_index + 1 {
-            return Err(
-                "上游地址应填写 Base URL，例如 https://example.com/v1，不能填写具体接口路径"
-                    .to_owned(),
-            );
-        }
-        normalized.extend_from_slice(&segments[..=v1_index]);
-    } else {
-        if segments.iter().any(|item| {
-            item.eq_ignore_ascii_case("images") || item.eq_ignore_ascii_case("responses")
-        }) {
-            return Err(
-                "上游地址应填写 Base URL，例如 https://example.com/v1，不能填写具体接口路径"
-                    .to_owned(),
-            );
-        }
-        normalized.extend_from_slice(&segments);
-        normalized.push("v1");
-    }
-
-    upstream.set_path(&format!("/{}", normalized.join("/")));
-    upstream.set_query(None);
-    upstream.set_fragment(None);
-    Ok(upstream.as_str().trim_end_matches('/').to_owned())
-}
-
-fn validate_ai_service_config(config: &AiServiceConfig) -> Result<AiRequestTarget, String> {
+fn validate_ai_service_config(config: &AiServiceConfig) -> Result<Url, String> {
     if config.model.trim().is_empty() {
         return Err("请填写 AI 模型名".to_owned());
     }
-
-    match config.connection_mode {
-        AiConnectionMode::Direct => {
-            let endpoint = validate_ai_url(&config.endpoint, "API 地址")?;
-            if !endpoint
-                .path()
-                .trim_end_matches('/')
-                .ends_with("/images/edits")
-            {
-                return Err(
-                    "请填写图像编辑完整地址，例如 https://example.com/v1/images/edits".to_owned(),
-                );
-            }
-            Ok(AiRequestTarget {
-                endpoint,
-                upstream_base_url: None,
-            })
-        }
-        AiConnectionMode::LindonProxy => {
-            let endpoint = validate_ai_url(&config.endpoint, "代理地址")?;
-            let upstream_base_url = normalize_lindon_upstream_base_url(&config.upstream_base_url)?;
-            Ok(AiRequestTarget {
-                endpoint: append_lindon_proxy_edit_path(endpoint)?,
-                upstream_base_url: Some(upstream_base_url),
-            })
-        }
+    let endpoint = validate_ai_url(&config.endpoint, "API 地址")?;
+    if !endpoint
+        .path()
+        .trim_end_matches('/')
+        .ends_with("/images/edits")
+    {
+        return Err(
+            "请填写图像编辑完整地址，例如 https://example.com/v1/images/edits".to_owned(),
+        );
     }
+    Ok(endpoint)
 }
 
 fn supported_ai_image_mime(path: &Path) -> Result<&'static str, String> {
@@ -248,13 +165,12 @@ fn extract_ai_image_source(response: &Value) -> Result<AiImageSource, String> {
     Err("AI 服务返回格式不兼容：未找到图片内容".to_owned())
 }
 
-fn describe_ai_http_error(status: reqwest::StatusCode, is_proxy: bool) -> String {
+fn describe_ai_http_error(status: reqwest::StatusCode) -> String {
     match status.as_u16() {
         401 | 403 => "AI 服务认证失败，请检查 API 地址和密钥。".to_owned(),
         408 | 504 => "AI 服务处理超时，请稍后重试。".to_owned(),
         413 => "图片文件过大，AI 服务拒绝处理。".to_owned(),
         429 => "AI 服务请求过于频繁或额度不足，请稍后重试。".to_owned(),
-        502 | 503 if is_proxy => "AI 代理或上游服务暂不可用，请检查代理部署和上游地址。".to_owned(),
         status => format!("AI 服务请求失败（HTTP {status}）。"),
     }
 }
@@ -307,8 +223,7 @@ async fn request_ai_handwriting_preview(
     input_path: String,
     config: AiServiceConfig,
 ) -> Result<AiHandwritingPreview, String> {
-    let target = validate_ai_service_config(&config)?;
-    let is_proxy = target.upstream_base_url.is_some();
+    let endpoint = validate_ai_service_config(&config)?;
     let api_key = read_ai_api_key()?;
     let source = PathBuf::from(&input_path);
     let mime = supported_ai_image_mime(&source)?;
@@ -331,24 +246,19 @@ async fn request_ai_handwriting_preview(
         .text("prompt", AI_HANDWRITING_PROMPT)
         .part("image", image_part);
     let client = ai_http_client()?;
-    let mut request = client
-        .post(target.endpoint)
+    let request = client
+        .post(endpoint)
         .bearer_auth(api_key)
         .multipart(form);
-    if let Some(upstream_base_url) = target.upstream_base_url {
-        request = request.header("X-Lindon-Upstream-Base-Url", upstream_base_url);
-    }
     let response = request.send().await.map_err(|error| {
         if error.is_timeout() {
             "AI 服务处理超时，请稍后重试。".to_owned()
-        } else if is_proxy {
-            "无法连接 AI 代理，请检查代理地址和网络。".to_owned()
         } else {
             "无法连接 AI 服务，请检查 API 地址和网络。".to_owned()
         }
     })?;
     if !response.status().is_success() {
-        return Err(describe_ai_http_error(response.status(), is_proxy));
+        return Err(describe_ai_http_error(response.status()));
     }
     let payload = response
         .json::<Value>()
@@ -952,7 +862,7 @@ mod tests {
     use super::{
         build_ai_output_path, describe_ai_http_error, expected_rgba_bytes, extract_ai_image_source,
         ocr_preprocess_dimensions, reconstruct_ocr_line, supported_ai_image_mime,
-        validate_ai_service_config, winrt_storage_path, AiConnectionMode, AiImageSource, AiServiceConfig,
+        validate_ai_service_config, winrt_storage_path, AiImageSource, AiServiceConfig,
     };
     use std::path::Path;
 
@@ -999,25 +909,19 @@ mod tests {
     #[test]
     fn accepts_https_and_localhost_ai_endpoints_only() {
         let https = AiServiceConfig {
-            connection_mode: AiConnectionMode::Direct,
             endpoint: "https://example.com/v1/images/edits".to_owned(),
-            upstream_base_url: String::new(),
             model: "image-model".to_owned(),
         };
         assert!(validate_ai_service_config(&https).is_ok());
 
         let local = AiServiceConfig {
-            connection_mode: AiConnectionMode::Direct,
             endpoint: "http://localhost:8080/v1/images/edits".to_owned(),
-            upstream_base_url: String::new(),
             model: "image-model".to_owned(),
         };
         assert!(validate_ai_service_config(&local).is_ok());
 
         let unsafe_remote = AiServiceConfig {
-            connection_mode: AiConnectionMode::Direct,
             endpoint: "http://example.com/v1/images/edits".to_owned(),
-            upstream_base_url: String::new(),
             model: "image-model".to_owned(),
         };
         assert!(validate_ai_service_config(&unsafe_remote).is_err());
@@ -1026,50 +930,12 @@ mod tests {
     #[test]
     fn rejects_empty_model_and_non_image_sources() {
         let missing_model = AiServiceConfig {
-            connection_mode: AiConnectionMode::Direct,
             endpoint: "https://example.com/v1/images/edits".to_owned(),
-            upstream_base_url: String::new(),
             model: " ".to_owned(),
         };
         assert!(validate_ai_service_config(&missing_model).is_err());
         assert!(supported_ai_image_mime(Path::new("worksheet.pdf")).is_err());
         assert_eq!(supported_ai_image_mime(Path::new("worksheet.PNG")), Ok("image/png"));
-    }
-
-    #[test]
-    fn builds_lindon_proxy_target_and_normalizes_its_upstream_base_url() {
-        let proxy = AiServiceConfig {
-            connection_mode: AiConnectionMode::LindonProxy,
-            endpoint: "https://tools.example.com/api-proxy.php".to_owned(),
-            upstream_base_url: "https://api.example.com/openai/v1".to_owned(),
-            model: "image-model".to_owned(),
-        };
-        let target = validate_ai_service_config(&proxy).expect("proxy settings should be valid");
-        assert_eq!(
-            target.endpoint.as_str(),
-            "https://tools.example.com/api-proxy.php/images/edits"
-        );
-        assert_eq!(
-            target.upstream_base_url.as_deref(),
-            Some("https://api.example.com/openai/v1")
-        );
-
-        let without_version = AiServiceConfig {
-            upstream_base_url: "https://api.example.com/openai".to_owned(),
-            ..proxy
-        };
-        let target = validate_ai_service_config(&without_version)
-            .expect("base URL without v1 should normalize");
-        assert_eq!(
-            target.upstream_base_url.as_deref(),
-            Some("https://api.example.com/openai/v1")
-        );
-
-        let operation_url = AiServiceConfig {
-            upstream_base_url: "https://api.example.com/v1/images/edits".to_owned(),
-            ..without_version
-        };
-        assert!(validate_ai_service_config(&operation_url).is_err());
     }
 
     #[test]
@@ -1101,16 +967,16 @@ mod tests {
     #[test]
     fn maps_provider_errors_without_returning_provider_body() {
         assert_eq!(
-            describe_ai_http_error(reqwest::StatusCode::UNAUTHORIZED, false),
+            describe_ai_http_error(reqwest::StatusCode::UNAUTHORIZED),
             "AI 服务认证失败，请检查 API 地址和密钥。"
         );
         assert_eq!(
-            describe_ai_http_error(reqwest::StatusCode::TOO_MANY_REQUESTS, false),
+            describe_ai_http_error(reqwest::StatusCode::TOO_MANY_REQUESTS),
             "AI 服务请求过于频繁或额度不足，请稍后重试。"
         );
         assert_eq!(
-            describe_ai_http_error(reqwest::StatusCode::BAD_GATEWAY, true),
-            "AI 代理或上游服务暂不可用，请检查代理部署和上游地址。"
+            describe_ai_http_error(reqwest::StatusCode::BAD_GATEWAY),
+            "AI 服务请求失败（HTTP 502）。"
         );
     }
 }

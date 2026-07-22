@@ -289,8 +289,6 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
 .ai-service-form label small { color: var(--success); font-size: 11px; font-weight: 600; }
 .ai-service-form input, .ai-service-form select { width: 100%; min-height: 39px; border: 1px solid var(--line-strong); border-radius: 6px; outline: 0; background: var(--surface); padding: 0 10px; color: #375268; }
 .ai-service-form input:focus, .ai-service-form select:focus { border-color: #6da7d5; box-shadow: 0 0 0 3px rgb(52 126 189 / 12%); }
-.ai-proxy-hint { grid-column: 1 / -1; margin: -2px 0 0; color: #648096; font-size: 12px; line-height: 1.55; }
-.ai-proxy-hint code { color: #3d6f96; }
 .ai-service-actions { grid-column: 2; }
 
 .education-screen { max-width: 1120px; }
