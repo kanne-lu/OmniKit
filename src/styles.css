@@ -71,7 +71,7 @@ h1, h2, h3, p { margin: 0; }
 .local-note { display: flex; align-items: center; gap: 7px; padding: 14px 10px 1px; color: var(--subtle); font-size: 12px; }
 .local-dot, .status-dot { display: inline-block; width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: #2d8b78; }
 
-.app-main { min-width: 0; flex: 1; }
+.app-main { position: relative; min-width: 0; flex: 1; }
 .topbar { position: relative; display: flex; height: 64px; align-items: center; border-bottom: 1px solid var(--line); background: rgb(255 255 255 / 72%); padding: 0 32px; }
 .search-field { display: flex; width: min(100%, 560px); height: 36px; align-items: center; gap: 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); padding: 0 9px 0 12px; color: #708394; transition: border-color .14s ease, box-shadow .14s ease; }
 .search-field:focus-within { border-color: #6da7d5; box-shadow: 0 0 0 3px rgb(52 126 189 / 12%); }
@@ -82,6 +82,8 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
 .window-controls button { display: grid; width: 44px; place-items: center; border: 0; background: transparent; color: #718394; cursor: pointer; transition: background .14s ease, color .14s ease; }
 .window-controls button:hover { background: #eaf3fa; color: #245f93; }
 .window-controls .close-control:hover { background: #c9535b; color: white; }
+.app-mascot { position: absolute; z-index: 2; top: 70px; left: 55%; width: min(184px, 18vw); pointer-events: none; transform: translateX(-50%); user-select: none; }
+.app-mascot img { display: block; width: 100%; height: auto; transform: scaleX(-1); transform-origin: center; }
 .app-content { height: calc(100vh - 64px); overflow: auto; scrollbar-color: #bfd0dc transparent; scrollbar-width: thin; }
 .app-main.is-workspace .topbar { height: 34px; justify-content: flex-end; border-bottom: 0; background: transparent; }
 .app-main.is-workspace .search-field { display: none; }
@@ -345,7 +347,7 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
 
 @media print {
   body { overflow: visible; background: #fff; }
-  .sidebar, .topbar, .workspace-toolbar, .tool-breadcrumb, .tool-titlebar, .copybook-controls, .copybook-preview-heading { display: none !important; }
+  .sidebar, .topbar, .app-mascot, .workspace-toolbar, .tool-breadcrumb, .tool-titlebar, .copybook-controls, .copybook-preview-heading { display: none !important; }
   .app-shell, .app-main, .app-content, .workspace-view, .tool-screen, .copybook-layout, .copybook-preview-panel { display: block; width: auto; height: auto; overflow: visible; margin: 0; border: 0; padding: 0; background: #fff; }
   .copybook-page { min-height: 0; padding: 11mm; background: #fff; }
 }
@@ -424,6 +426,7 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
   .window-controls { display: none; }
   .search-field { width: 100%; }
   .app-content, .app-main.is-workspace .app-content { height: auto; overflow: visible; }
+  .app-mascot { top: 67px; left: 66%; width: 126px; }
   .app-main.is-workspace .topbar { height: 24px; }
   .home-view, .info-view, .workspace-view { padding: 22px 15px 34px; }
   .home-header { align-items: flex-start; flex-direction: column; gap: 13px; padding-bottom: 18px; }

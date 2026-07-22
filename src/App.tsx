@@ -4,6 +4,7 @@ import { Sidebar, type AppView } from './components/Sidebar';
 import { ToolHome } from './components/ToolHome';
 import { ToolWorkspace } from './components/ToolWorkspace';
 import { Topbar } from './components/Topbar';
+import mascotImage from './assets/omnikit-koala.png';
 import {
   appendClipboardText,
   clearUnpinnedClipboardEntries,
@@ -104,6 +105,9 @@ export default function App() {
       <Sidebar activeView={activeView} activeCategory={activeCategory} onCategoryChange={setCategory} onNavigate={navigate} />
       <section className={activeTool ? 'app-main is-workspace' : 'app-main'}>
         <Topbar compact={Boolean(activeTool)} query={query} onQueryChange={(value) => { setQuery(value); setActiveToolId(null); setActiveView('home'); }} />
+        <div className="app-mascot" aria-hidden="true">
+          <img src={mascotImage} alt="" />
+        </div>
         <div className="app-content">
           {activeTool ? <ToolWorkspace
             tool={activeTool}
