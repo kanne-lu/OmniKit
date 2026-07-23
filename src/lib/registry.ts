@@ -1,8 +1,34 @@
 export const CATEGORIES = ['图片工具', '文本工具', '文件工具', '开发工具', '教育工具'] as const;
 
 export type Category = (typeof CATEGORIES)[number];
-export type ToolId = 'json' | 'base64' | 'clipboard' | 'hash' | 'rename' | 'image' | 'ocr' | 'copybook' | 'wordcount' | 'handwriting-removal';
-export type ToolIcon = 'braces' | 'binary' | 'clipboard' | 'hash' | 'rename' | 'image' | 'ocr' | 'copybook' | 'wordcount' | 'handwriting';
+export type ToolId =
+  | 'json'
+  | 'base64'
+  | 'clipboard'
+  | 'hash'
+  | 'rename'
+  | 'image'
+  | 'image-crop'
+  | 'image-watermark'
+  | 'image-stitch'
+  | 'ocr'
+  | 'copybook'
+  | 'wordcount'
+  | 'handwriting-removal';
+export type ToolIcon =
+  | 'braces'
+  | 'binary'
+  | 'clipboard'
+  | 'hash'
+  | 'rename'
+  | 'image'
+  | 'crop'
+  | 'watermark'
+  | 'stitch'
+  | 'ocr'
+  | 'copybook'
+  | 'wordcount'
+  | 'handwriting';
 
 export interface ToolDefinition {
   id: ToolId;
@@ -56,11 +82,35 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
   },
   {
     id: 'image',
-    name: '图片压缩',
-    description: '压缩或转换 JPG、PNG 与 WebP 图片',
+    name: '批量图片处理',
+    description: '批量压缩、缩放或转换 JPG、PNG 与 WebP 图片',
     category: '图片工具',
     icon: 'image',
-    keywords: ['图片', '压缩', '转换', 'jpg', 'png', 'webp'],
+    keywords: ['图片', '批量', '压缩', '缩放', '转换', 'jpg', 'png', 'webp'],
+  },
+  {
+    id: 'image-crop',
+    name: '裁剪与旋转',
+    description: '自由裁剪、按比例取景，并旋转或翻转图片',
+    category: '图片工具',
+    icon: 'crop',
+    keywords: ['图片', '裁剪', '旋转', '翻转', '比例'],
+  },
+  {
+    id: 'image-watermark',
+    name: '图片加水印',
+    description: '添加文字或图片水印，支持九宫格定位与平铺',
+    category: '图片工具',
+    icon: 'watermark',
+    keywords: ['图片', '水印', '文字水印', '图片水印', '平铺'],
+  },
+  {
+    id: 'image-stitch',
+    name: '拼接与切图',
+    description: '横向或纵向拼接图片，并支持定高与九宫格切图',
+    category: '图片工具',
+    icon: 'stitch',
+    keywords: ['图片', '长图', '拼接', '切图', '九宫格'],
   },
   {
     id: 'ocr',

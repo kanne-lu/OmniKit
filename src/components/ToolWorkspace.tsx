@@ -4,7 +4,8 @@ import type { ClipboardHistoryEntry } from '../lib/clipboardHistory';
 import { ClipboardTool } from './ClipboardTool';
 import { CodecTool } from './CodecTool';
 import { AiHandwritingRemovalTool, CopybookTool, WordCountTool } from './EducationTools';
-import { HashTool, ImageTool, RenameTool } from './FileTools';
+import { HashTool, RenameTool } from './FileTools';
+import { BatchImageTool, ImageCropTool, ImageStitchTool, ImageWatermarkTool } from './ImageTools';
 import { JsonTool } from './JsonTool';
 import { OcrTool } from './OcrTool';
 
@@ -43,7 +44,10 @@ export function ToolWorkspace({
     clipboard: <ClipboardTool entries={clipboardEntries} isRecording={isClipboardRecording} error={clipboardError} onRecordingChange={onClipboardRecordingChange} onRemove={onClipboardEntryRemove} onTogglePin={onClipboardPinToggle} onClear={onClipboardClear} onCopied={onClipboardCopied} />,
     hash: <HashTool />,
     rename: <RenameTool />,
-    image: <ImageTool />,
+    image: <BatchImageTool />,
+    'image-crop': <ImageCropTool />,
+    'image-watermark': <ImageWatermarkTool />,
+    'image-stitch': <ImageStitchTool />,
     ocr: <OcrTool />,
     copybook: <CopybookTool />,
     wordcount: <WordCountTool />,

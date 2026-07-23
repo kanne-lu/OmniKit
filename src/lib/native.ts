@@ -23,6 +23,96 @@ export interface ImageResult {
   height: number;
 }
 
+export type ImageOutputFormat = 'preserve' | 'jpg' | 'png' | 'webp';
+export type ImageRotation = 0 | 90 | 180 | 270;
+export type ImageWatermarkPosition =
+  | 'topLeft'
+  | 'topCenter'
+  | 'topRight'
+  | 'centerLeft'
+  | 'center'
+  | 'centerRight'
+  | 'bottomLeft'
+  | 'bottomCenter'
+  | 'bottomRight';
+
+export interface NormalizedImageCrop {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PrepareImagePreviewRequest {
+  inputPath: string;
+}
+
+export interface ImagePreviewResult {
+  previewPath: string;
+  inputBytes: number;
+  width: number;
+  height: number;
+}
+
+export interface ProcessImageRequest {
+  inputPath: string;
+  outputDir: string;
+  format: ImageOutputFormat;
+  maxDimension?: number | null;
+  jpegQuality: number;
+}
+
+export interface TransformImageRequest {
+  inputPath: string;
+  outputDir: string;
+  crop?: NormalizedImageCrop | null;
+  rotation: ImageRotation;
+  flipHorizontal: boolean;
+  flipVertical: boolean;
+  format: ImageOutputFormat;
+  jpegQuality: number;
+}
+
+export interface WatermarkImageRequest {
+  inputPath: string;
+  outputDir: string;
+  kind: 'text' | 'image';
+  text?: string | null;
+  watermarkPath?: string | null;
+  opacity: number;
+  size: number;
+  margin: number;
+  position: ImageWatermarkPosition;
+  tiled: boolean;
+  format: ImageOutputFormat;
+  jpegQuality: number;
+}
+
+export interface StitchImagesRequest {
+  inputPaths: string[];
+  outputDir: string;
+  direction: 'vertical' | 'horizontal';
+  format: ImageOutputFormat;
+  jpegQuality: number;
+}
+
+export interface SplitImageRequest {
+  inputPath: string;
+  outputDir: string;
+  mode: 'fixedHeight' | 'nineGrid';
+  pieceHeight?: number | null;
+  format: ImageOutputFormat;
+  jpegQuality: number;
+}
+
+export interface ImageJobResult {
+  outputPath: string;
+  inputBytes: number;
+  outputBytes: number;
+  width: number;
+  height: number;
+}
+
 export interface ClipboardImage {
   width: number;
   height: number;
@@ -61,6 +151,13 @@ export async function chooseFile(filters?: { name: string; extensions: string[] 
   ensureDesktop();
   const path = await open({ multiple: false, directory: false, filters });
   return typeof path === 'string' ? path : null;
+}
+
+export async function chooseFiles(filters?: { name: string; extensions: string[] }[]): Promise<string[]> {
+  ensureDesktop();
+  const paths = await open({ multiple: true, directory: false, filters });
+  if (Array.isArray(paths)) return paths;
+  return typeof paths === 'string' ? [paths] : [];
 }
 
 export async function chooseFolder(): Promise<string | null> {
@@ -113,6 +210,20 @@ export const native = {
     invoke<number>('copy_renamed_files', { inputDir, outputDir, prefix, startNumber, separator }),
   convertImage: (inputPath: string, outputDir: string, format: string, maxDimension: number, quality: number) =>
     invoke<ImageResult>('convert_image', { inputPath, outputDir, format, maxDimension, quality }),
+  prepareImagePreview: (request: PrepareImagePreviewRequest) =>
+    invoke<ImagePreviewResult>('prepare_image_preview', { request }),
+  removeImagePreview: (previewPath: string) =>
+    invoke<void>('remove_image_preview', { previewPath }),
+  processImage: (request: ProcessImageRequest) =>
+    invoke<ImageJobResult>('process_image', { request }),
+  transformImage: (request: TransformImageRequest) =>
+    invoke<ImageJobResult>('transform_image', { request }),
+  watermarkImage: (request: WatermarkImageRequest) =>
+    invoke<ImageJobResult>('watermark_image', { request }),
+  stitchImages: (request: StitchImagesRequest) =>
+    invoke<ImageJobResult>('stitch_images', { request }),
+  splitImage: (request: SplitImageRequest) =>
+    invoke<ImageJobResult[]>('split_image', { request }),
   recognizeImageFile: (path: string) => invoke<OcrResult>('recognize_image_file', { path }),
   recognizeClipboardImage: ({ width, height, bytes }: ClipboardImage) =>
     invoke<OcrResult>('recognize_clipboard_image', { width, height, bytes }),

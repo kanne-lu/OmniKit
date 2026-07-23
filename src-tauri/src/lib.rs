@@ -1,3 +1,5 @@
+mod image_jobs;
+
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
@@ -13,6 +15,11 @@ use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use image_jobs::{
+    prepare_image_preview, process_image, remove_image_preview, split_image, stitch_images,
+    transform_image, watermark_image,
+};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -849,6 +856,13 @@ pub fn run() {
             preview_rename,
             copy_renamed_files,
             convert_image,
+            prepare_image_preview,
+            remove_image_preview,
+            process_image,
+            transform_image,
+            watermark_image,
+            stitch_images,
+            split_image,
             recognize_image_file,
             recognize_clipboard_image,
             write_text_file
