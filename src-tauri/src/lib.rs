@@ -83,7 +83,7 @@ enum AiImageSource {
 
 const AI_SECRET_SERVICE: &str = "OmniKit";
 const AI_SECRET_ACCOUNT: &str = "ai-image-edit-api-key";
-const AI_HANDWRITING_PROMPT: &str = "Remove handwritten annotations, notes, marks, and answers from this worksheet while preserving all printed text, layout, tables, lines, illustrations, and paper background. Return a clean, faithful worksheet image only.";
+const AI_HANDWRITING_PROMPT: &str = "Remove only existing handwritten annotations, notes, marks, and answers from this worksheet. Never solve questions or generate, infer, reconstruct, complete, correct, or add any answers, text, numbers, formulas, symbols, check marks, labels, or annotations, even when the correct answer appears obvious. Wherever handwriting is removed, restore only blank paper, original printed lines, table borders, or the unchanged background texture. Preserve every existing printed character, question, layout, table, line, illustration, margin, and paper background exactly. Do not rewrite, translate, sharpen, restyle, crop, or alter printed content. If uncertain whether content is printed or handwritten, leave it unchanged. Return one clean, faithful worksheet image only.";
 
 fn ai_api_key_entry() -> Result<Entry, String> {
     Entry::new(AI_SECRET_SERVICE, AI_SECRET_ACCOUNT)
