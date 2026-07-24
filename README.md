@@ -66,31 +66,6 @@ OmniKit 将高频的小工具集中在统一工作台中，支持搜索、收藏
 - 只有 AI 图片工具会在用户主动操作后访问已配置的第三方服务。
 - OmniKit 不内置公共 AI 密钥，也不会自动替用户发起 AI 请求。
 
-## 📦 获取应用
-
-前往 [GitHub Releases](https://github.com/kanne-lu/OmniKit/releases) 下载最新 Windows 版本。应用内也可以检查并安装已发布的更新。
-
-## 🛠️ 本地开发
-
-需要 Node.js、Rust 和 Tauri 在 Windows 上所需的构建环境。
-
-```powershell
-npm install
-npm run tauri dev
-```
-
-运行测试与前端生产构建：
-
-```powershell
-npm run check
-```
-
-构建桌面安装包：
-
-```powershell
-npm run tauri build
-```
-
 <div align="center">
   <sub>高效工具，纯净体验，尽在 OmniKit。</sub>
 </div>
