@@ -39,7 +39,7 @@ export function Topbar({ query, onQueryChange, compact = false }: TopbarProps) {
       <label className="search-field">
         <Search size={21} aria-hidden="true" />
         <input ref={searchInputRef} value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索工具" aria-label="搜索工具" aria-keyshortcuts="Control+K Meta+K" />
-        <kbd>Ctrl K</kbd>
+        {query ? <button className="search-clear" type="button" onClick={() => onQueryChange('')} aria-label="清除搜索"><X size={15} /></button> : <kbd>Ctrl K</kbd>}
       </label>
       {desktopRuntime && <div className="window-controls" aria-label="窗口控制">
         <button type="button" onClick={() => void controlWindow('minimize')} aria-label="最小化"><Minus size={17} /></button>

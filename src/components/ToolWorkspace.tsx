@@ -58,7 +58,7 @@ export function ToolWorkspace({
     <section className="workspace-view">
       <div className="workspace-toolbar">
         <button className="back-button" type="button" onClick={onBack}><ArrowLeft size={18} /> 返回工作台</button>
-        <button className={isFavorite ? 'favorite-button is-favorite' : 'favorite-button'} type="button" onClick={() => onToggleFavorite(tool.id)} aria-label="收藏工具"><Star size={18} fill={isFavorite ? 'currentColor' : 'none'} /></button>
+        <button className={isFavorite ? 'favorite-button is-favorite' : 'favorite-button'} type="button" onClick={() => onToggleFavorite(tool.id)} aria-label={isFavorite ? `取消收藏 ${tool.name}` : `收藏 ${tool.name}`}><Star size={18} fill={isFavorite ? 'currentColor' : 'none'} /></button>
       </div>
       {content}
     </section>

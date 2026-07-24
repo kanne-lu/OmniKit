@@ -4,8 +4,6 @@ import { Sidebar, type AppView } from './components/Sidebar';
 import { ToolHome } from './components/ToolHome';
 import { ToolWorkspace } from './components/ToolWorkspace';
 import { Topbar } from './components/Topbar';
-import mainMascotVideo from './assets/omnikit-mascot-main.mp4';
-import pageMascotVideo from './assets/omnikit-mascot-pages.mp4';
 import {
   appendClipboardText,
   clearUnpinnedClipboardEntries,
@@ -50,8 +48,6 @@ export default function App() {
     return matchingTools;
   }, [activeCategory, activeView, favoriteTools, query, recentTools]);
   const activeTool = activeToolId ? TOOL_BY_ID.get(activeToolId) : undefined;
-  const isMainWorkspace = !activeTool && activeView === 'home' && activeCategory === 'all';
-  const mascotVideo = isMainWorkspace ? mainMascotVideo : pageMascotVideo;
 
   useEffect(() => { localStorage.setItem(`${STORAGE_PREFIX}recent`, JSON.stringify(recent)); }, [recent]);
   useEffect(() => { localStorage.setItem(`${STORAGE_PREFIX}favorites`, JSON.stringify(favorites)); }, [favorites]);
@@ -104,22 +100,11 @@ export default function App() {
       : { title: '工作台', description: '选择一个工具，在本机完成处理。', emptyMessage: '没有找到匹配的工具。' };
 
   return (
-    <main className={reducedMotion ? 'app-shell reduced-motion' : 'app-shell'}>
+    <div className={reducedMotion ? 'app-shell reduced-motion' : 'app-shell'}>
+      <a className="skip-link" href="#main-content">跳到主内容</a>
       <Sidebar activeView={activeView} activeCategory={activeCategory} onCategoryChange={setCategory} onNavigate={navigate} />
-      <section className={activeTool ? 'app-main is-workspace' : 'app-main'}>
+      <main id="main-content" className={activeTool ? 'app-main is-workspace' : 'app-main'}>
         <Topbar compact={Boolean(activeTool)} query={query} onQueryChange={(value) => { setQuery(value); setActiveToolId(null); setActiveView('home'); }} />
-        <div className="app-mascot" aria-hidden="true">
-          <video
-            key={`${mascotVideo}-${reducedMotion}`}
-            src={mascotVideo}
-            autoPlay={!reducedMotion}
-            loop
-            muted
-            playsInline
-            preload="auto"
-            disablePictureInPicture
-          />
-        </div>
         <div className="app-content">
           {activeTool ? <ToolWorkspace
             tool={activeTool}
@@ -136,7 +121,7 @@ export default function App() {
             onClipboardCopied={(text) => setClipboardEntries((current) => appendClipboardText(current, text, Date.now()))}
           /> : activeView === 'settings' ? <SettingsPanel recentCount={recent.length} favoriteCount={favorites.length} reducedMotion={reducedMotion} onReducedMotionChange={setReducedMotion} onClearRecent={() => setRecent([])} onClearFavorites={() => setFavorites([])} /> : activeView === 'about' ? <AboutPanel /> : <ToolHome {...screenCopy} tools={visibleTools} recent={recent} favorites={favorites} onOpenTool={openTool} onToggleFavorite={toggleFavorite} />}
         </div>
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }

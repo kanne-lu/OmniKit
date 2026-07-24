@@ -41,11 +41,11 @@ export function Sidebar({ activeView, activeCategory, onCategoryChange, onNaviga
       </button>
 
       <nav className="sidebar-primary" aria-label="主导航">
-        <button className={isHomeActive ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onCategoryChange('all')}>
+        <button className={isHomeActive ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onCategoryChange('all')} aria-current={isHomeActive ? 'page' : undefined}>
           <Grid2X2 size={20} /> <span>全部</span>
         </button>
-        <button className={activeView === 'recent' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('recent')}><Clock3 size={20} /> <span>最近使用</span></button>
-        <button className={activeView === 'favorites' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('favorites')}><Star size={20} /> <span>收藏</span></button>
+        <button className={activeView === 'recent' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('recent')} aria-current={activeView === 'recent' ? 'page' : undefined}><Clock3 size={20} /> <span>最近使用</span></button>
+        <button className={activeView === 'favorites' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('favorites')} aria-current={activeView === 'favorites' ? 'page' : undefined}><Star size={20} /> <span>收藏</span></button>
       </nav>
 
       <div className="sidebar-divider" />
@@ -58,6 +58,7 @@ export function Sidebar({ activeView, activeCategory, onCategoryChange, onNaviga
               type="button"
               key={category}
               onClick={() => onCategoryChange(category)}
+              aria-current={activeCategory === category ? 'page' : undefined}
             >
               <Icon size={20} /> <span>{category}</span>
             </button>
@@ -66,8 +67,8 @@ export function Sidebar({ activeView, activeCategory, onCategoryChange, onNaviga
       </nav>
 
       <div className="sidebar-footer">
-        <button className={activeView === 'settings' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('settings')}><Settings2 size={20} /> <span>设置</span></button>
-        <button className={activeView === 'about' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('about')}><Info size={20} /> <span>关于</span></button>
+        <button className={activeView === 'settings' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('settings')} aria-current={activeView === 'settings' ? 'page' : undefined}><Settings2 size={20} /> <span>设置</span></button>
+        <button className={activeView === 'about' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('about')} aria-current={activeView === 'about' ? 'page' : undefined}><Info size={20} /> <span>关于</span></button>
         <div className="local-note"><span className="local-dot" /> 本机模式</div>
       </div>
     </aside>
