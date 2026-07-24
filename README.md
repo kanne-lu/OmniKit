@@ -1,10 +1,3 @@
----
-title: OmniKit
-description: 面向 Windows 的本地优先桌面工具箱
-version: 0.1.4
-updated: 2026-07-24
----
-
 <div align="center">
   <img src="docs/images/omnikit-logo.png" alt="OmniKit" width="180" />
 
