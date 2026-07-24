@@ -448,7 +448,8 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
 .crop-dimensions strong { color: #3f627b; font-family: var(--mono); font-size: 12px; font-weight: 600; }
 .crop-preview-stage { min-height: 500px; }
 .image-crop-media { position: relative; max-width: 100%; overflow: hidden; background: #e9eff3; cursor: crosshair; touch-action: none; user-select: none; }
-.image-crop-media > img { position: absolute; width: 100%; height: 100%; inset: 0; object-fit: contain; pointer-events: none; }
+.crop-preview-transform { position: absolute; top: 50%; left: 50%; transform-origin: center; }
+.crop-preview-transform > img { position: absolute; width: 100%; height: 100%; inset: 0; object-fit: contain; pointer-events: none; }
 .crop-selection { position: absolute; border: 1px solid #fff; box-shadow: 0 0 0 1px #2877b7, 0 0 0 9999px rgb(21 38 51 / 44%); pointer-events: none; }
 .crop-selection::before, .crop-selection::after { position: absolute; background: rgb(255 255 255 / 72%); content: ''; }
 .crop-selection::before { top: 33.33%; bottom: 33.33%; left: 0; right: 0; border-top: 1px solid rgb(255 255 255 / 62%); border-bottom: 1px solid rgb(255 255 255 / 62%); background: transparent; }

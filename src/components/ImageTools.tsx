@@ -85,12 +85,32 @@ function previewUrl(path: string | null | undefined): string | null {
   return path ? convertFileSrc(path) : null;
 }
 
-function previewFrameStyle(preview: ImagePreviewResult, maxWidth = 720, maxHeight = 500): CSSProperties {
-  const ratio = preview.width / preview.height;
+function previewFrameStyle(preview: ImagePreviewResult, maxWidth = 720, maxHeight = 500, rotation: ImageRotation = 0): CSSProperties {
+  const rotated = rotation === 90 || rotation === 270;
+  const ratio = rotated ? preview.height / preview.width : preview.width / preview.height;
   return {
-    aspectRatio: `${preview.width} / ${preview.height}`,
+    aspectRatio: rotated ? `${preview.height} / ${preview.width}` : `${preview.width} / ${preview.height}`,
     width: Math.max(1, Math.min(maxWidth, maxHeight * ratio)),
     maxWidth: '100%',
+  };
+}
+
+export function pointFromTransformedPreview(point: NormalizedPoint, rotation: ImageRotation, flipHorizontal: boolean, flipVertical: boolean): NormalizedPoint {
+  let x = flipHorizontal ? 1 - point.x : point.x;
+  let y = flipVertical ? 1 - point.y : point.y;
+  if (rotation === 90) return { x: y, y: 1 - x };
+  if (rotation === 180) return { x: 1 - x, y: 1 - y };
+  if (rotation === 270) return { x: 1 - y, y: x };
+  return { x, y };
+}
+
+function cropPreviewTransformStyle(preview: ImagePreviewResult, rotation: ImageRotation, flipHorizontal: boolean, flipVertical: boolean): CSSProperties {
+  const quarterTurn = rotation === 90 || rotation === 270;
+  const ratio = preview.width / preview.height;
+  return {
+    width: quarterTurn ? `${ratio * 100}%` : '100%',
+    height: quarterTurn ? `${100 / ratio}%` : '100%',
+    transform: `translate(-50%, -50%) scaleX(${flipHorizontal ? -1 : 1}) scaleY(${flipVertical ? -1 : 1}) rotate(${rotation}deg)`,
   };
 }
 
@@ -430,7 +450,7 @@ export function ImageCropTool() {
   const beginCrop = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!preview || busy) return;
     cropBeforeDrag.current = crop;
-    dragStart.current = pointFromPointer(event);
+    dragStart.current = pointFromTransformedPreview(pointFromPointer(event), rotation, flipHorizontal, flipVertical);
     event.currentTarget.setPointerCapture(event.pointerId);
     setCrop({ x: dragStart.current.x, y: dragStart.current.y, width: 0, height: 0 });
     invalidateResult();
@@ -438,7 +458,7 @@ export function ImageCropTool() {
 
   const updateCrop = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!preview || !dragStart.current) return;
-    setCrop(cropFromDrag(dragStart.current, pointFromPointer(event), ratioValue, preview));
+    setCrop(cropFromDrag(dragStart.current, pointFromTransformedPreview(pointFromPointer(event), rotation, flipHorizontal, flipVertical), ratioValue, preview));
   };
 
   const finishCrop = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -511,18 +531,20 @@ export function ImageCropTool() {
           {sourceUrl && preview
             ? <div
               className="image-crop-media"
-              style={previewFrameStyle(preview)}
+              style={previewFrameStyle(preview, 720, 500, rotation)}
               onPointerDown={beginCrop}
               onPointerMove={updateCrop}
               onPointerUp={finishCrop}
               onPointerCancel={finishCrop}
             >
-              <img draggable={false} src={sourceUrl} alt="待裁剪图片" />
-              <span className="crop-selection" style={{ left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.width * 100}%`, height: `${crop.height * 100}%` }}><i /><i /><i /><i /></span>
+              <div className="crop-preview-transform" style={cropPreviewTransformStyle(preview, rotation, flipHorizontal, flipVertical)}>
+                <img draggable={false} src={sourceUrl} alt="待裁剪图片" />
+                <span className="crop-selection" style={{ left: `${crop.x * 100}%`, top: `${crop.y * 100}%`, width: `${crop.width * 100}%`, height: `${crop.height * 100}%` }}><i /><i /><i /><i /></span>
+              </div>
             </div>
             : <PreviewEmpty>选择图片后，可直接在这里拖动框选。</PreviewEmpty>}
         </div>
-        <footer className="image-preview-caption"><Move size={15} /><span>框选坐标以原图为准；旋转与翻转会在导出时应用。</span></footer>
+        <footer className="image-preview-caption"><Move size={15} /><span>旋转和翻转会立即反映在预览中；框选坐标仍以原图为准。</span></footer>
       </section>
     </div>
   </section>;
