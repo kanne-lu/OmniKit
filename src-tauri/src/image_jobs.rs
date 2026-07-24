@@ -20,8 +20,8 @@ const MAX_STITCH_IMAGES: usize = 30;
 const MAX_SPLIT_PIECES: usize = 500;
 const PREVIEW_MAX_EDGE: u32 = 1600;
 const TEXT_WATERMARK_FONT_RATIO: f32 = 0.22;
-const HARMONYOS_SANS_SC_REGULAR: &[u8] =
-    include_bytes!("../../src/assets/fonts/HarmonyOS_Sans_SC_Regular.ttf");
+const HARMONYOS_SANS_SC_BOLD: &[u8] =
+    include_bytes!("../../src/assets/fonts/HarmonyOS_Sans_SC_Bold.ttf");
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -650,7 +650,7 @@ fn build_text_watermark(
     if text.chars().count() > 80 {
         return Err("水印文字不能超过 80 个字符".to_owned());
     }
-    let font = FontArc::try_from_slice(HARMONYOS_SANS_SC_REGULAR)
+    let font = FontArc::try_from_slice(HARMONYOS_SANS_SC_BOLD)
         .map_err(|_| "无法加载 HarmonyOS Sans SC 字体".to_owned())?;
     let mut scale = (base_width as f32 * size * TEXT_WATERMARK_FONT_RATIO).max(1.0);
     let (initial_width, initial_height) = text_size(PxScale::from(scale), &font, text);
@@ -761,12 +761,23 @@ fn watermark_position(
 }
 
 fn overlay_tiled(base: &mut RgbaImage, watermark: &RgbaImage, gap: u32) {
-    let step_x = watermark.width().saturating_add(gap.max(1));
-    let step_y = watermark.height().saturating_add(gap.max(1));
-    let mut y = 0u32;
-    while y < base.height() {
-        let mut x = 0u32;
-        while x < base.width() {
+    let minimum_gap = watermark
+        .width()
+        .min(watermark.height())
+        .saturating_mul(45)
+        .saturating_div(100)
+        .clamp(16, 64);
+    let inset = gap.saturating_add(minimum_gap);
+    let step_x = watermark.width().saturating_add(inset);
+    let step_y = watermark.height().saturating_add(inset);
+    let max_x = base.width().saturating_sub(inset);
+    let max_y = base.height().saturating_sub(inset);
+    let mut row = 0u32;
+    let mut y = inset;
+    while y.saturating_add(watermark.height()) <= max_y {
+        let row_offset = if row % 2 == 0 { 0 } else { step_x / 2 };
+        let mut x = inset.saturating_add(row_offset);
+        while x.saturating_add(watermark.width()) <= max_x {
             imageops::overlay(base, watermark, i64::from(x), i64::from(y));
             let Some(next) = x.checked_add(step_x) else {
                 break;
@@ -777,6 +788,7 @@ fn overlay_tiled(base: &mut RgbaImage, watermark: &RgbaImage, gap: u32) {
             break;
         };
         y = next;
+        row = row.saturating_add(1);
     }
 }
 
@@ -1139,7 +1151,7 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let source = temp.path().join("base.png");
         let mark = temp.path().join("mark.png");
-        save_solid(&source, 8, 8, Rgba([0, 0, 0, 255]));
+        save_solid(&source, 100, 100, Rgba([0, 0, 0, 255]));
         save_solid(&mark, 2, 2, Rgba([255, 255, 255, 255]));
         let request = |tiled| WatermarkImageRequest {
             input_path: source.to_string_lossy().to_string(),
@@ -1158,13 +1170,16 @@ mod tests {
 
         let placed = ImageJobService.watermark(request(false)).unwrap();
         let placed = read_rgba(&placed.output_path);
-        assert!(placed.get_pixel(7, 7).0[0] >= 127);
+        assert!(placed.get_pixel(99, 99).0[0] >= 127);
         assert_eq!(placed.get_pixel(0, 0), &Rgba([0, 0, 0, 255]));
 
         let tiled = ImageJobService.watermark(request(true)).unwrap();
         let tiled = read_rgba(&tiled.output_path);
-        assert!(tiled.get_pixel(0, 0).0[0] >= 127);
-        assert!(tiled.get_pixel(3, 0).0[0] >= 127);
+        assert_eq!(tiled.get_pixel(0, 0), &Rgba([0, 0, 0, 255]));
+        assert!(tiled.get_pixel(16, 16).0[0] >= 127);
+        assert!(tiled.get_pixel(57, 16).0[0] >= 127);
+        assert!(tiled.get_pixel(36, 57).0[0] >= 127);
+        assert_eq!(tiled.get_pixel(16, 57), &Rgba([0, 0, 0, 255]));
     }
 
     #[test]

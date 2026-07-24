@@ -475,7 +475,7 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
 .watermark-single { position: absolute; display: grid; place-items: center; opacity: var(--watermark-opacity); }
 .watermark-single.is-image { width: var(--watermark-size); }
 .watermark-single.is-text { width: max-content; max-width: 100%; }
-.watermark-text { color: #204967; font-size: var(--watermark-font-size); font-weight: 700; line-height: 1.2; white-space: nowrap; }
+.watermark-text { color: #204967; font-size: var(--watermark-font-size); font-weight: 700; line-height: 1; white-space: nowrap; }
 .watermark-image { display: block; width: 100%; height: auto; object-fit: contain; }
 .watermark-placeholder { display: inline-flex; align-items: center; gap: 4px; border: 1px dashed rgb(255 255 255 / 74%); padding: 4px; color: white; font-size: 9px; white-space: nowrap; }
 .watermark-preview-media.is-topLeft .watermark-single { top: var(--watermark-margin); left: var(--watermark-margin); }
@@ -487,9 +487,11 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
 .watermark-preview-media.is-bottomLeft .watermark-single { bottom: var(--watermark-margin); left: var(--watermark-margin); }
 .watermark-preview-media.is-bottomCenter .watermark-single { bottom: var(--watermark-margin); left: 50%; transform: translateX(-50%); }
 .watermark-preview-media.is-bottomRight .watermark-single { right: var(--watermark-margin); bottom: var(--watermark-margin); }
-.watermark-tile-grid { position: absolute; display: flex; overflow: hidden; flex-wrap: wrap; align-content: flex-start; align-items: flex-start; gap: var(--watermark-gap); inset: 0; opacity: var(--watermark-opacity); }
-.watermark-tile-grid > div { display: grid; flex: 0 0 auto; place-items: center; }
-.watermark-tile-grid.is-image > div { width: var(--watermark-size); }
+.watermark-tile-grid { position: absolute; display: grid; box-sizing: border-box; overflow: hidden; align-content: start; gap: var(--watermark-gap); inset: 0; opacity: var(--watermark-opacity); padding: var(--watermark-gap); }
+.watermark-tile-row { display: flex; flex: 0 0 auto; width: max-content; gap: var(--watermark-gap); }
+.watermark-tile-row.is-offset { margin-left: var(--watermark-tile-offset); }
+.watermark-tile { display: grid; flex: 0 0 auto; place-items: center; }
+.watermark-tile-grid.is-image .watermark-tile { width: var(--watermark-size); }
 
 .image-mode-switch { margin-bottom: 13px; }
 .image-mode-switch button { min-width: 132px; }

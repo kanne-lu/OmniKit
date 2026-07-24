@@ -51,6 +51,8 @@ import {
 } from '../lib/native';
 
 const IMAGE_FILTERS = [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp'] }];
+const DEFAULT_WATERMARK_MARGIN = 24;
+const DEFAULT_TILED_WATERMARK_GAP = 0;
 const FORMAT_OPTIONS: { value: ImageOutputFormat; label: string }[] = [
   { value: 'preserve', label: '跟随原格式' },
   { value: 'jpg', label: 'JPG' },
@@ -562,16 +564,77 @@ const WATERMARK_POSITIONS: { value: ImageWatermarkPosition; label: string }[] = 
   { value: 'bottomRight', label: '右下' },
 ];
 
+type WatermarkTileLayout = {
+  rows: number;
+  evenColumns: number;
+  oddColumns: number;
+  offset: number;
+  gap: number;
+};
+
+function minimumWatermarkTileGap(width: number, height: number) {
+  return Math.min(64, Math.max(16, Math.round(Math.min(width, height) * 0.45)));
+}
+
+function estimateTextWatermarkDimensions(text: string, baseWidth: number, size: number) {
+  const fontSize = Math.max(1, baseWidth * size * 0.22);
+  const fallbackWidth = Array.from(text).reduce((total, character) => total + (character.charCodeAt(0) < 128 ? 0.62 : 1), 0) * fontSize;
+  if (typeof document === 'undefined') return { width: fallbackWidth + 4, height: fontSize + 4 };
+  const context = document.createElement('canvas').getContext('2d');
+  if (!context) return { width: fallbackWidth + 4, height: fontSize + 4 };
+  context.font = `700 ${fontSize}px "HarmonyOS Sans SC"`;
+  const metrics = context.measureText(text);
+  return {
+    width: Math.max(1, metrics.width + 4),
+    height: Math.max(1, metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent + 4),
+  };
+}
+
+function calculateWatermarkTileLayout(
+  preview: ImagePreviewResult,
+  kind: 'text' | 'image',
+  text: string,
+  watermarkPreview: ImagePreviewResult | null,
+  size: number,
+  gap: number,
+): WatermarkTileLayout {
+  const textDimensions = estimateTextWatermarkDimensions(text.trim() || '水印文字', preview.width, size);
+  const imageWidth = Math.max(1, preview.width * size);
+  const imageHeight = watermarkPreview
+    ? imageWidth * watermarkPreview.height / Math.max(1, watermarkPreview.width)
+    : imageWidth * 0.62;
+  const watermarkWidth = kind === 'text' ? textDimensions.width : imageWidth;
+  const watermarkHeight = kind === 'text' ? textDimensions.height : imageHeight;
+  const normalizedGap = Math.max(0, gap) + minimumWatermarkTileGap(watermarkWidth, watermarkHeight);
+  const usableWidth = Math.max(1, preview.width - normalizedGap * 2);
+  const usableHeight = Math.max(1, preview.height - normalizedGap * 2);
+  const stepX = watermarkWidth + normalizedGap;
+  const stepY = watermarkHeight + normalizedGap;
+  const offset = stepX / 2;
+  const evenColumns = Math.floor((usableWidth + normalizedGap) / stepX);
+  const rows = Math.floor((usableHeight + normalizedGap) / stepY);
+
+  return {
+    rows: evenColumns > 0 ? Math.max(0, rows) : 0,
+    evenColumns: Math.max(0, evenColumns),
+    oddColumns: Math.max(0, Math.floor((Math.max(0, usableWidth - offset) + normalizedGap) / stepX)),
+    offset,
+    gap: normalizedGap,
+  };
+}
+
 function WatermarkVisual({
   kind,
   text,
   imageUrl,
   tiled,
+  tileLayout,
 }: {
   kind: 'text' | 'image';
   text: string;
   imageUrl: string | null;
   tiled: boolean;
+  tileLayout: WatermarkTileLayout | null;
 }) {
   const content = kind === 'text'
     ? <span className="watermark-text">{text.trim() || '水印文字'}</span>
@@ -580,7 +643,12 @@ function WatermarkVisual({
       : <span className="watermark-placeholder"><ImageIcon size={18} /> 水印图</span>;
 
   if (!tiled) return <div className={`watermark-single is-${kind}`}>{content}</div>;
-  return <div className={`watermark-tile-grid is-${kind}`}>{Array.from({ length: 400 }, (_, index) => <div key={index}>{kind === 'text' ? <span className="watermark-text">{text.trim() || '水印文字'}</span> : imageUrl ? <img className="watermark-image" src={imageUrl} alt="" /> : <span className="watermark-placeholder">水印图</span>}</div>)}</div>;
+  const renderTile = (key: string) => <div className="watermark-tile" key={key}>{kind === 'text' ? <span className="watermark-text">{text.trim() || '水印文字'}</span> : imageUrl ? <img className="watermark-image" src={imageUrl} alt="" /> : <span className="watermark-placeholder">水印图</span>}</div>;
+  const rows = tileLayout?.rows ?? 1;
+  return <div className={`watermark-tile-grid is-${kind}`}>{Array.from({ length: rows }, (_, rowIndex) => {
+    const columnCount = rowIndex % 2 === 0 ? tileLayout?.evenColumns ?? 1 : tileLayout?.oddColumns ?? 1;
+    return <div className={`watermark-tile-row ${rowIndex % 2 === 0 ? '' : 'is-offset'}`} key={rowIndex}>{Array.from({ length: columnCount }, (_, columnIndex) => renderTile(`${rowIndex}-${columnIndex}`))}</div>;
+  })}</div>;
 }
 
 export function ImageWatermarkTool() {
@@ -594,7 +662,8 @@ export function ImageWatermarkTool() {
   const [position, setPosition] = useState<ImageWatermarkPosition>('bottomRight');
   const [opacity, setOpacity] = useState(0.42);
   const [size, setSize] = useState(0.22);
-  const [margin, setMargin] = useState(24);
+  const [margin, setMargin] = useState(DEFAULT_WATERMARK_MARGIN);
+  const [tiledGap, setTiledGap] = useState(DEFAULT_TILED_WATERMARK_GAP);
   const [tiled, setTiled] = useState(false);
   const [format, setFormat] = useState<ImageOutputFormat>('preserve');
   const [quality, setQuality] = useState(88);
@@ -666,7 +735,7 @@ export function ImageWatermarkTool() {
         watermarkPath: kind === 'image' ? watermarkPath : null,
         opacity,
         size,
-        margin,
+        margin: spacing,
         position,
         tiled,
         format,
@@ -683,12 +752,18 @@ export function ImageWatermarkTool() {
 
   const baseUrl = previewUrl(preview?.previewPath);
   const markUrl = previewUrl(watermarkPreview?.previewPath);
+  const spacing = tiled ? tiledGap : margin;
+  const tileLayout = useMemo(
+    () => preview && tiled ? calculateWatermarkTileLayout(preview, kind, text, watermarkPreview, size, tiledGap) : null,
+    [kind, preview, size, text, tiled, tiledGap, watermarkPreview],
+  );
   const previewStyle = {
     '--watermark-opacity': String(opacity),
     '--watermark-size': `${size * 100}%`,
     '--watermark-font-size': `${size * 22}cqw`,
     '--watermark-margin': `${preview ? margin / Math.max(1, preview.width) * 100 : 0}cqw`,
-    '--watermark-gap': `${preview ? margin / Math.max(1, preview.width) * 100 : 0}cqw`,
+    '--watermark-gap': `${preview ? (tiled ? tileLayout?.gap ?? spacing : spacing) / Math.max(1, preview.width) * 100 : 0}cqw`,
+    '--watermark-tile-offset': `${preview && tileLayout ? tileLayout.offset / Math.max(1, preview.width) * 100 : 0}cqw`,
   } as CSSProperties;
   const canExport = Boolean(preview && inputPath && outputDir && (kind === 'text' ? text.trim() : watermarkPath));
 
@@ -709,9 +784,9 @@ export function ImageWatermarkTool() {
         <div className="image-range-stack">
           <label className="image-field"><span>透明度 <b>{Math.round(opacity * 100)}%</b></span><input disabled={busy !== null} type="range" min="0.1" max="1" step="0.05" value={opacity} onChange={(event) => { setOpacity(Number(event.target.value)); invalidateWatermarkResult(); }} /></label>
           <label className="image-field"><span>大小 <b>{Math.round(size * 100)}%</b></span><input disabled={busy !== null} type="range" min="0.05" max="0.5" step="0.01" value={size} onChange={(event) => { setSize(Number(event.target.value)); invalidateWatermarkResult(); }} /></label>
-          <label className="image-field"><span>{tiled ? '平铺间距' : '边距'} <b>{margin}px</b></span><input disabled={busy !== null} type="range" min="0" max="100" step="2" value={margin} onChange={(event) => { setMargin(Number(event.target.value)); invalidateWatermarkResult(); }} /></label>
+          <label className="image-field"><span>{tiled ? '额外间距' : '边距'} <b>{spacing}px</b></span><input disabled={busy !== null} type="range" min="0" max="100" step="2" value={spacing} onChange={(event) => { const nextValue = Number(event.target.value); if (tiled) setTiledGap(nextValue); else setMargin(nextValue); invalidateWatermarkResult(); }} /></label>
         </div>
-        <label className="image-check-row"><input checked={tiled} disabled={busy !== null} type="checkbox" onChange={(event) => { setTiled(event.target.checked); invalidateWatermarkResult(); }} /><span><strong>平铺覆盖</strong><small>均匀重复水印，九宫格位置暂不生效</small></span></label>
+        <label className="image-check-row"><input checked={tiled} disabled={busy !== null} type="checkbox" onChange={(event) => { setTiled(event.target.checked); invalidateWatermarkResult(); }} /><span><strong>平铺覆盖</strong><small>自动保留最小留白；0px 表示不额外增加间距</small></span></label>
         <FormatFields format={format} quality={quality} disabled={busy !== null} onFormatChange={(value) => { setFormat(value); invalidateWatermarkResult(); }} onQualityChange={(value) => { setQuality(value); invalidateWatermarkResult(); }} />
         <div className="image-primary-actions"><button className="primary-button" type="button" disabled={!canExport || busy !== null} onClick={() => void exportImage()}>{busy === 'export' ? <LoaderCircle className="spin" size={17} /> : <Layers3 size={17} />} {busy === 'export' ? '正在导出' : '导出水印图片'}</button></div>
         <NoticeLine notice={notice} />
@@ -722,7 +797,7 @@ export function ImageWatermarkTool() {
         <div className="image-panel-heading"><span>效果预览</span><small>{preview ? `${preview.width} × ${preview.height}` : '等待选择底图'}</small></div>
         <div className="image-preview-stage watermark-preview-stage">
           {baseUrl && preview
-            ? <div className={`watermark-preview-media is-${position} ${tiled ? 'is-tiled' : ''}`} style={{ ...previewStyle, ...previewFrameStyle(preview, 760) }}><img className="watermark-base-image" src={baseUrl} alt="水印底图" /><WatermarkVisual kind={kind} text={text} imageUrl={markUrl} tiled={tiled} /></div>
+            ? <div className={`watermark-preview-media is-${position} ${tiled ? 'is-tiled' : ''}`} style={{ ...previewStyle, ...previewFrameStyle(preview, 760) }}><img className="watermark-base-image" src={baseUrl} alt="水印底图" /><WatermarkVisual kind={kind} text={text} imageUrl={markUrl} tiled={tiled} tileLayout={tileLayout} /></div>
             : <PreviewEmpty>选择底图后，这里会显示水印的近似效果。</PreviewEmpty>}
         </div>
         <footer className="image-preview-caption"><ShieldCheck size={15} /><span>预览用于确认布局；导出时会按原图尺寸精确计算。</span></footer>
