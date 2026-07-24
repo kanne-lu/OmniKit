@@ -139,12 +139,13 @@ export interface AiHandwritingPreview {
   height: number;
 }
 
-export type AiImageOperation = 'cutout' | 'restore' | 'upscale';
+export type AiImageOperation = 'idPhotoBackground' | 'cutout' | 'restore' | 'upscale';
 
 export interface AiImageToolRequest {
   inputPath: string;
   operation: AiImageOperation;
   upscaleFactor?: 2 | 4 | null;
+  backgroundColor?: string | null;
   config: AiServiceConfig;
 }
 
@@ -153,13 +154,6 @@ export interface SaveAiImageToolResultRequest {
   inputPath: string;
   outputDir: string;
   operation: AiImageOperation;
-}
-
-export interface SaveAiBackgroundResultRequest {
-  previewPath: string;
-  inputPath: string;
-  outputDir: string;
-  backgroundColor: string;
 }
 
 export function isDesktopRuntime(): boolean {
@@ -233,8 +227,6 @@ export const native = {
     invoke<void>('remove_ai_image_preview', { previewPath }),
   saveAiImageToolResult: (request: SaveAiImageToolResultRequest) =>
     invoke<ImageResult>('save_ai_image_tool_result', { request }),
-  saveAiBackgroundResult: (request: SaveAiBackgroundResultRequest) =>
-    invoke<ImageResult>('save_ai_background_result', { request }),
   previewRename: (inputDir: string, outputDir: string, prefix: string, startNumber: number, separator: string) =>
     invoke<RenamePreviewItem[]>('preview_rename', { inputDir, outputDir, prefix, startNumber, separator }),
   copyRenamedFiles: (inputDir: string, outputDir: string, prefix: string, startNumber: number, separator: string) =>

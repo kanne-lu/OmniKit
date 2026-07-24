@@ -2,7 +2,7 @@ mod image_jobs;
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use image::codecs::jpeg::JpegEncoder;
-use image::imageops::{self, FilterType};
+use image::imageops::FilterType;
 use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader, Rgba, RgbaImage};
 use keyring::Entry;
 use md5::{Digest as Md5Digest, Md5};
@@ -79,6 +79,7 @@ struct AiHandwritingPreview {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 enum AiImageOperation {
+    IdPhotoBackground,
     Cutout,
     Restore,
     Upscale,
@@ -90,6 +91,7 @@ struct AiImageToolRequest {
     input_path: String,
     operation: AiImageOperation,
     upscale_factor: Option<u8>,
+    background_color: Option<String>,
     config: AiServiceConfig,
 }
 
@@ -102,18 +104,10 @@ struct SaveAiImageToolResultRequest {
     operation: AiImageOperation,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct SaveAiBackgroundResultRequest {
-    preview_path: String,
-    input_path: String,
-    output_dir: String,
-    background_color: String,
-}
-
 #[derive(Clone, Copy)]
 enum AiPreviewRule {
     Any,
+    Opaque,
     Transparent,
     Enlarged,
 }
@@ -132,8 +126,18 @@ const MAX_AI_RESULT_BYTES: usize = 50 * 1024 * 1024;
 const MAX_AI_RESULT_PIXELS: u64 = 60_000_000;
 
 impl AiImageOperation {
-    fn prompt(self, upscale_factor: Option<u8>) -> Result<String, String> {
+    fn prompt(
+        self,
+        upscale_factor: Option<u8>,
+        background_color: Option<&str>,
+    ) -> Result<String, String> {
         match self {
+            Self::IdPhotoBackground => {
+                let color = background_color.ok_or_else(|| "证件照换底色需要指定背景颜色".to_owned())?;
+                let color = parse_hex_color(color)?;
+                let color = format!("#{:02X}{:02X}{:02X}", color.0[0], color.0[1], color.0[2]);
+                Ok(format!("Create a complete, natural-looking ID photo from this image with a uniform solid {color} background. Preserve the person's identity, face, hair, clothing, proportions, pose, sharpness, and framing exactly. Replace only the background with the requested solid color. Do not return a transparent foreground, white placeholder, gradient, texture, shadow, extra objects, text, or decorative elements. Return one final opaque image only."))
+            }
             Self::Cutout => Ok("Remove the entire background and return the original foreground subject on a fully transparent background. Preserve the subject, face, hair, clothing, edges, colors, proportions, and all foreground details exactly. Do not add shadows, borders, objects, text, or a replacement background. Return a PNG with a real alpha channel.".to_owned()),
             Self::Restore => Ok("Restore this old photo conservatively. Reduce scratches, dust, noise, fading, and mild blur while preserving every person's identity, facial features, pose, composition, objects, text, and the original color character. Do not beautify faces, colorize a monochrome image, invent details, add objects, or restyle the photo. Return only the faithfully restored image.".to_owned()),
             Self::Upscale => {
@@ -148,6 +152,7 @@ impl AiImageOperation {
 
     fn preview_rule(self) -> AiPreviewRule {
         match self {
+            Self::IdPhotoBackground => AiPreviewRule::Opaque,
             Self::Cutout => AiPreviewRule::Transparent,
             Self::Restore => AiPreviewRule::Any,
             Self::Upscale => AiPreviewRule::Enlarged,
@@ -156,6 +161,7 @@ impl AiImageOperation {
 
     fn output_label(self) -> &'static str {
         match self {
+            Self::IdPhotoBackground => "证件照换底色",
             Self::Cutout => "智能抠图",
             Self::Restore => "老照片修复",
             Self::Upscale => "图片放大增强",
@@ -303,6 +309,13 @@ fn validate_ai_preview_image(
     }
     match rule {
         AiPreviewRule::Any => Ok(()),
+        AiPreviewRule::Opaque => {
+            let has_transparency = image.to_rgba8().pixels().any(|pixel| pixel.0[3] < 255);
+            if has_transparency {
+                return Err("AI 鏈嶅姟杩斿洖浜嗘湁閫忔槑鑳屾櫙鐨勭粨鏋滐紝璇疯繑鍥炲甫瀹炴湁鑹插悗鏅殑瀹屾暣璇佷欢鐓с€?".to_owned());
+            }
+            Ok(())
+        }
         AiPreviewRule::Transparent => {
             let rgba = image.to_rgba8();
             let has_transparency = rgba.pixels().any(|pixel| pixel.0[3] < 255);
@@ -849,7 +862,9 @@ async fn preview_ai_handwriting_removal(
 async fn preview_ai_image_tool(
     request: AiImageToolRequest,
 ) -> Result<AiHandwritingPreview, String> {
-    let prompt = request.operation.prompt(request.upscale_factor)?;
+    let prompt = request
+        .operation
+        .prompt(request.upscale_factor, request.background_color.as_deref())?;
     request_ai_image_preview(
         request.input_path,
         request.config,
@@ -959,37 +974,6 @@ async fn save_ai_image_tool_result(
     })
     .await
     .map_err(|error| format!("AI 图片保存任务异常终止：{error}"))?
-}
-
-#[tauri::command]
-async fn save_ai_background_result(
-    request: SaveAiBackgroundResultRequest,
-) -> Result<ImageResult, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let (_, image) = load_ai_preview(&request.preview_path)?;
-        validate_ai_preview_image(
-            &image,
-            AiPreviewRule::Transparent,
-            image.dimensions(),
-        )?;
-        let color = parse_hex_color(&request.background_color)?;
-        let foreground = image.to_rgba8();
-        let mut background = RgbaImage::from_pixel(image.width(), image.height(), color);
-        imageops::overlay(&mut background, &foreground, 0, 0);
-        let output_dir = validate_ai_output_dir(&request.output_dir)?;
-        let output_path = available_ai_output_path(
-            Path::new(&request.input_path),
-            &output_dir,
-            "证件照换底色",
-        );
-        save_ai_png(
-            &DynamicImage::ImageRgba8(background),
-            &output_path,
-            "证件照换底色",
-        )
-    })
-    .await
-    .map_err(|error| format!("证件照保存任务异常终止：{error}"))?
 }
 
 #[tauri::command]
@@ -1161,7 +1145,6 @@ pub fn run() {
             preview_ai_image_tool,
             remove_ai_image_preview,
             save_ai_image_tool_result,
-            save_ai_background_result,
             preview_rename,
             copy_renamed_files,
             convert_image,
@@ -1292,9 +1275,19 @@ mod tests {
 
     #[test]
     fn builds_upscale_prompts_for_supported_factors_only() {
-        assert!(AiImageOperation::Upscale.prompt(Some(2)).unwrap().contains("2x"));
-        assert!(AiImageOperation::Upscale.prompt(Some(4)).unwrap().contains("4x"));
-        assert!(AiImageOperation::Upscale.prompt(Some(3)).is_err());
+        assert!(AiImageOperation::Upscale.prompt(Some(2), None).unwrap().contains("2x"));
+        assert!(AiImageOperation::Upscale.prompt(Some(4), None).unwrap().contains("4x"));
+        assert!(AiImageOperation::Upscale.prompt(Some(3), None).is_err());
+    }
+
+    #[test]
+    fn builds_certificate_background_prompts_independently() {
+        let prompt = AiImageOperation::IdPhotoBackground
+            .prompt(None, Some("#d9474d"))
+            .unwrap();
+        assert!(prompt.contains("#D9474D"));
+        assert!(prompt.contains("complete, natural-looking ID photo"));
+        assert!(AiImageOperation::IdPhotoBackground.prompt(None, None).is_err());
     }
 
     #[test]
@@ -1308,6 +1301,17 @@ mod tests {
         assert!(validate_ai_preview_image(&valid, AiPreviewRule::Transparent, (2, 1)).is_ok());
         assert!(validate_ai_preview_image(&opaque, AiPreviewRule::Transparent, (2, 1)).is_err());
         assert!(validate_ai_preview_image(&empty, AiPreviewRule::Transparent, (2, 1)).is_err());
+    }
+
+    #[test]
+    fn rejects_transparent_results_for_certificate_backgrounds() {
+        let opaque = DynamicImage::ImageRgba8(RgbaImage::from_pixel(2, 1, Rgba([20, 30, 40, 255])));
+        let partially_transparent = DynamicImage::ImageRgba8(RgbaImage::from_fn(2, 1, |x, _| {
+            if x == 0 { Rgba([20, 30, 40, 255]) } else { Rgba([20, 30, 40, 120]) }
+        }));
+
+        assert!(validate_ai_preview_image(&opaque, AiPreviewRule::Opaque, (2, 1)).is_ok());
+        assert!(validate_ai_preview_image(&partially_transparent, AiPreviewRule::Opaque, (2, 1)).is_err());
     }
 
     #[test]

@@ -44,11 +44,11 @@ interface ToolCopy {
 const TOOL_COPY: Record<AiImageToolVariant, ToolCopy> = {
   background: {
     title: '证件照换底色',
-    description: 'AI 提取人像一次，背景换色与保存都在本机完成。',
-    operation: 'cutout',
-    action: '开始提取人像',
+    description: 'AI 独立生成指定纯色背景的完整证件照。',
+    operation: 'idPhotoBackground',
+    action: '开始换底色',
     resultAlt: '更换底色后的证件照预览',
-    note: 'AI 仅负责人像抠图；白、蓝、红或自定义底色均在本机合成，换色不会重复调用 AI。',
+    note: '每个底色都会向统一 API 独立发起一次请求，不读取或复用智能抠图结果。',
   },
   cutout: {
     title: '智能抠图',
@@ -222,6 +222,7 @@ function AiImageTool({ variant }: { variant: AiImageToolVariant }) {
         inputPath,
         operation: copy.operation,
         upscaleFactor: copy.operation === 'upscale' ? upscaleFactor : null,
+        backgroundColor: copy.operation === 'idPhotoBackground' ? backgroundColor : null,
         config,
       });
       if (!mountedRef.current) {
@@ -248,19 +249,12 @@ function AiImageTool({ variant }: { variant: AiImageToolVariant }) {
     setMessage('正在保存结果副本…');
     setMessageTone('neutral');
     try {
-      const result = variant === 'background'
-        ? await native.saveAiBackgroundResult({
-          previewPath: preview.previewPath,
-          inputPath,
-          outputDir,
-          backgroundColor,
-        })
-        : await native.saveAiImageToolResult({
-          previewPath: preview.previewPath,
-          inputPath,
-          outputDir,
-          operation: copy.operation,
-        });
+      const result = await native.saveAiImageToolResult({
+        previewPath: preview.previewPath,
+        inputPath,
+        outputDir,
+        operation: copy.operation,
+      });
       if (!mountedRef.current) return;
       setSavedResult(result);
       setMessage(`${copy.title}结果已保存为新文件，原图未修改。`);
@@ -275,17 +269,14 @@ function AiImageTool({ variant }: { variant: AiImageToolVariant }) {
     }
   };
 
-  const updateBackgroundColor = (value: string) => {
+  const updateBackgroundColor = async (value: string) => {
     setBackgroundColor(value.toUpperCase());
-    setSavedResult(null);
-    if (preview) {
-      setMessage('底色已在本地更新，确认预览后可直接保存，不会再次调用 AI。');
-      setMessageTone('neutral');
-    }
+    await clearPreview();
+    setMessage('底色已更新，请重新开始 AI 处理；这会向同一个 API 发起独立请求。');
+    setMessageTone('neutral');
   };
 
   const resultStageClass = variant === 'cutout' ? 'ai-image-stage is-checkerboard' : 'ai-image-stage';
-  const resultStageStyle = variant === 'background' && preview ? { backgroundColor } : undefined;
   const resultDimensions = preview ? `${preview.width} × ${preview.height}` : '等待 AI 结果';
 
   return <section className="tool-screen image-tool-screen ai-image-tool-screen">
@@ -320,9 +311,9 @@ function AiImageTool({ variant }: { variant: AiImageToolVariant }) {
               className={backgroundColor === preset.value ? 'is-selected' : ''}
               type="button"
               disabled={pending}
-              onClick={() => updateBackgroundColor(preset.value)}
+              onClick={() => void updateBackgroundColor(preset.value)}
             ><i style={{ backgroundColor: preset.value }} /> {preset.label}</button>)}
-            <label className="ai-custom-color"><input type="color" value={backgroundColor} disabled={pending} onChange={(event) => updateBackgroundColor(event.target.value)} /><span>自定义</span></label>
+            <label className="ai-custom-color"><input type="color" value={backgroundColor} disabled={pending} onChange={(event) => void updateBackgroundColor(event.target.value)} /><span>自定义</span></label>
           </div>
           <small className="ai-color-value">当前颜色 {backgroundColor}</small>
         </fieldset>}
@@ -342,7 +333,7 @@ function AiImageTool({ variant }: { variant: AiImageToolVariant }) {
           <button className="primary-button" type="button" disabled={pending || !inputPath || !outputDir} onClick={() => void createPreview()}>
             {pending ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} {pending ? '处理中' : copy.action}
           </button>
-          {preview && <button className="secondary-button" type="button" disabled={pending} onClick={() => void saveResult()}><Save size={16} /> {variant === 'background' ? '保存当前底色' : '确认保存副本'}</button>}
+          {preview && <button className="secondary-button" type="button" disabled={pending} onClick={() => void saveResult()}><Save size={16} /> 确认保存副本</button>}
         </div>
         {savedResult && <div className="image-result-card"><Check size={19} /><span><strong>结果已保存</strong><small>{savedResult.width} × {savedResult.height} · {formatBytes(savedResult.bytes)}</small><code title={savedResult.outputPath}>{savedResult.outputPath}</code></span></div>}
         {message && <p className={`image-notice${messageTone === 'success' ? ' is-success' : messageTone === 'error' ? ' is-error' : ''}`} aria-live="polite">{message}</p>}
@@ -358,8 +349,8 @@ function AiImageTool({ variant }: { variant: AiImageToolVariant }) {
             </div>
           </figure>
           <figure>
-            <figcaption><span>{variant === 'background' ? `效果预览 · ${backgroundColor}` : 'AI 结果'}</span><small>{resultDimensions}</small></figcaption>
-            <div className={resultStageClass} style={resultStageStyle}>
+            <figcaption><span>{variant === 'background' ? `AI 结果 · ${backgroundColor}` : 'AI 结果'}</span><small>{resultDimensions}</small></figcaption>
+            <div className={resultStageClass}>
               {resultUrl ? <img src={resultUrl} alt={copy.resultAlt} /> : <div className="image-workbench-empty"><Sparkles size={28} /><span>完成 AI 处理后在这里检查结果</span></div>}
             </div>
           </figure>
