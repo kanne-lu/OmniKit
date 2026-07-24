@@ -123,7 +123,7 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
   {
     id: 'id-photo-background',
     name: '证件照换底色',
-    description: 'AI 提取人像后，在本地更换白、蓝、红或自定义纯色背景',
+    description: '使用配置的 AI 服务生成白、蓝、红或自定义纯色背景证件照',
     category: '图片工具',
     icon: 'id-photo',
     keywords: ['证件照', '换底色', '背景色', '人像', 'ai'],

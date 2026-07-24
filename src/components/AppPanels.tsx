@@ -162,7 +162,7 @@ export function AboutPanel({ mascotVideoSrc, reducedMotion }: AboutPanelProps) {
     <header className="info-heading"><span className="section-kicker">OMNIKIT</span><h1 id="about-title">关于</h1><p>为日常处理任务准备的本地工具箱。</p></header>
     <div className="about-layout">
       <article className="about-card">
-        <div className="about-card-header"><div className="about-mark"><BrandMark /><div><strong>OmniKit</strong><small>桌面端全能工具集合</small></div></div><span className="about-version">v0.1.3</span></div>
+        <div className="about-card-header"><div className="about-mark"><BrandMark /><div><strong>OmniKit</strong><small>桌面端全能工具集合</small></div></div><span className="about-version">v0.1.4</span></div>
         <div className="about-intro">
           <div>
             <span className="section-kicker">一站式本地工具箱</span>
