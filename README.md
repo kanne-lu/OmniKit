@@ -8,6 +8,8 @@
   文本、文件、图片与教育工具集中在一个干净、轻量的 Windows 应用中。
 
   当前版本：`v0.1.4`
+
+  <img src="docs/images/omnikit-mascot-workbench.png" alt="OmniKit 吉祥物在工作台前挥手" width="420" />
 </div>
 
 ![OmniKit 工作台预览](docs/images/omnikit-overview.png)
