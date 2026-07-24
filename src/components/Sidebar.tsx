@@ -37,10 +37,11 @@ export function Sidebar({ activeView, activeCategory, onCategoryChange, onNaviga
     <aside className="sidebar">
       <button className="brand" type="button" onClick={() => onNavigate('home')} aria-label="返回 OmniKit 工作台">
         <BrandMark />
-        <span>OmniKit</span>
+        <span className="brand-copy"><strong>OmniKit</strong><small>本地工具箱</small></span>
       </button>
 
       <nav className="sidebar-primary" aria-label="主导航">
+        <span className="sidebar-section-label">工作区</span>
         <button className={isHomeActive ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onCategoryChange('all')} aria-current={isHomeActive ? 'page' : undefined}>
           <Grid2X2 size={20} /> <span>全部</span>
         </button>
@@ -50,6 +51,7 @@ export function Sidebar({ activeView, activeCategory, onCategoryChange, onNaviga
 
       <div className="sidebar-divider" />
       <nav className="category-nav" aria-label="工具分类">
+        <span className="sidebar-section-label">工具分类</span>
         {CATEGORIES.map((category) => {
           const Icon = categoryIcons[category];
           return (
@@ -67,6 +69,7 @@ export function Sidebar({ activeView, activeCategory, onCategoryChange, onNaviga
       </nav>
 
       <div className="sidebar-footer">
+        <span className="sidebar-section-label">应用</span>
         <button className={activeView === 'settings' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('settings')} aria-current={activeView === 'settings' ? 'page' : undefined}><Settings2 size={20} /> <span>设置</span></button>
         <button className={activeView === 'about' ? 'nav-row is-active' : 'nav-row'} type="button" onClick={() => onNavigate('about')} aria-current={activeView === 'about' ? 'page' : undefined}><Info size={20} /> <span>关于</span></button>
         <div className="local-note"><span className="local-dot" /> 本机模式</div>

@@ -19,7 +19,7 @@ export function ToolHome({ title, description, emptyMessage, tools, recent, favo
     <section className="home-view">
       <header className="home-header">
         <div>
-          <span className="section-kicker">OMNIKIT</span>
+          <span className="section-kicker">OMNIKIT · 本地工具箱</span>
           <h1>{title}</h1>
           <p>{description}</p>
         </div>
@@ -41,7 +41,7 @@ export function ToolHome({ title, description, emptyMessage, tools, recent, favo
               <article className="tool-row" data-tool={tool.id} key={tool.id}>
                 <button className="tool-row-main" type="button" onClick={() => onOpenTool(tool.id)}>
                   <span className="tool-icon"><ToolIconGlyph name={tool.icon} /></span>
-                  <span className="tool-copy"><strong>{tool.name}</strong><small>{tool.description}</small></span>
+                  <span className="tool-copy"><small className="tool-category">{tool.category}</small><strong>{tool.name}</strong><small>{tool.description}</small></span>
                   <span className="tool-row-arrow" aria-hidden="true">›</span>
                 </button>
                 <button

@@ -36,6 +36,7 @@ export function Topbar({ query, onQueryChange, compact = false }: TopbarProps) {
         if (event.button === 0 && event.target === event.currentTarget) void controlWindow('startDragging');
       }}
     >
+      {compact && <span className="compact-window-title">OmniKit</span>}
       <label className="search-field">
         <Search size={21} aria-hidden="true" />
         <input ref={searchInputRef} value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="搜索工具" aria-label="搜索工具" aria-keyshortcuts="Control+K Meta+K" />
