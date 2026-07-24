@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AboutPanel, SettingsPanel } from './components/AppPanels';
 import { Sidebar, type AppView } from './components/Sidebar';
 import { ToolHome } from './components/ToolHome';
@@ -30,6 +30,7 @@ function loadToolList(key: string): ToolId[] {
 }
 
 export default function App() {
+  const contentRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
   const [activeView, setActiveView] = useState<AppView>('home');
@@ -57,6 +58,7 @@ export default function App() {
 
   useEffect(() => { localStorage.setItem(`${STORAGE_PREFIX}recent`, JSON.stringify(recent)); }, [recent]);
   useEffect(() => { localStorage.setItem(`${STORAGE_PREFIX}favorites`, JSON.stringify(favorites)); }, [favorites]);
+  useEffect(() => { contentRef.current?.scrollTo({ top: 0, left: 0 }); }, [activeCategory, activeToolId, activeView]);
   useEffect(() => { localStorage.setItem(`${STORAGE_PREFIX}reduced-motion`, String(reducedMotion)); }, [reducedMotion]);
 
   useEffect(() => { localStorage.setItem(CLIPBOARD_HISTORY_STORAGE_KEY, JSON.stringify(clipboardEntries)); }, [clipboardEntries]);
@@ -111,7 +113,7 @@ export default function App() {
       <Sidebar activeView={activeView} activeCategory={activeCategory} onCategoryChange={setCategory} onNavigate={navigate} />
       <main id="main-content" className={activeTool ? 'app-main is-workspace' : 'app-main'}>
         <Topbar compact={Boolean(activeTool)} query={query} onQueryChange={(value) => { setQuery(value); setActiveToolId(null); setActiveView('home'); }} />
-        <div className="app-content">
+        <div className="app-content" ref={contentRef}>
           {activeTool ? <ToolWorkspace
             tool={activeTool}
             isFavorite={favorites.includes(activeTool.id)}

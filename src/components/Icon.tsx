@@ -11,8 +11,12 @@ import {
   Layers2,
   NotebookPen,
   ScanText,
+  Scissors,
+  Sparkles,
   Stamp,
   TextCursorInput,
+  UserRound,
+  ZoomIn,
 } from 'lucide-react';
 import type { ToolIcon } from '../lib/registry';
 
@@ -26,6 +30,10 @@ const iconByName: Record<ToolIcon, LucideIcon> = {
   crop: Crop,
   watermark: Stamp,
   stitch: Layers2,
+  'id-photo': UserRound,
+  cutout: Scissors,
+  restore: Sparkles,
+  upscale: ZoomIn,
   ocr: ScanText,
   copybook: NotebookPen,
   wordcount: TextCursorInput,

@@ -139,6 +139,29 @@ export interface AiHandwritingPreview {
   height: number;
 }
 
+export type AiImageOperation = 'cutout' | 'restore' | 'upscale';
+
+export interface AiImageToolRequest {
+  inputPath: string;
+  operation: AiImageOperation;
+  upscaleFactor?: 2 | 4 | null;
+  config: AiServiceConfig;
+}
+
+export interface SaveAiImageToolResultRequest {
+  previewPath: string;
+  inputPath: string;
+  outputDir: string;
+  operation: AiImageOperation;
+}
+
+export interface SaveAiBackgroundResultRequest {
+  previewPath: string;
+  inputPath: string;
+  outputDir: string;
+  backgroundColor: string;
+}
+
 export function isDesktopRuntime(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
@@ -204,6 +227,14 @@ export const native = {
     invoke<AiHandwritingPreview>('preview_ai_handwriting_removal', { inputPath, config }),
   saveAiHandwritingResult: (previewPath: string, inputPath: string, outputDir: string) =>
     invoke<ImageResult>('save_ai_handwriting_result', { previewPath, inputPath, outputDir }),
+  previewAiImageTool: (request: AiImageToolRequest) =>
+    invoke<AiHandwritingPreview>('preview_ai_image_tool', { request }),
+  removeAiImagePreview: (previewPath: string) =>
+    invoke<void>('remove_ai_image_preview', { previewPath }),
+  saveAiImageToolResult: (request: SaveAiImageToolResultRequest) =>
+    invoke<ImageResult>('save_ai_image_tool_result', { request }),
+  saveAiBackgroundResult: (request: SaveAiBackgroundResultRequest) =>
+    invoke<ImageResult>('save_ai_background_result', { request }),
   previewRename: (inputDir: string, outputDir: string, prefix: string, startNumber: number, separator: string) =>
     invoke<RenamePreviewItem[]>('preview_rename', { inputDir, outputDir, prefix, startNumber, separator }),
   copyRenamedFiles: (inputDir: string, outputDir: string, prefix: string, startNumber: number, separator: string) =>

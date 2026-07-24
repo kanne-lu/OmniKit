@@ -16,6 +16,10 @@ describe('tool categories', () => {
       'image-crop',
       'image-watermark',
       'image-stitch',
+      'id-photo-background',
+      'smart-cutout',
+      'old-photo-restoration',
+      'ai-upscale',
       'ocr',
     ]);
     expect(searchTools('', '文本工具').map((tool) => tool.id)).toEqual(['clipboard']);
@@ -28,7 +32,7 @@ describe('tool categories', () => {
   });
 
   it('keeps the all-tools search available', () => {
-    expect(searchTools('', 'all')).toHaveLength(13);
+    expect(searchTools('', 'all')).toHaveLength(17);
     expect(searchTools('base64', '开发工具').map((tool) => tool.id)).toEqual(['base64']);
     expect(searchTools('去手写', '教育工具').map((tool) => tool.id)).toEqual(['handwriting-removal']);
   });

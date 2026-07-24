@@ -78,7 +78,7 @@ export function SettingsPanel({ recentCount, favoriteCount, reducedMotion, onRed
       <article className="settings-panel"><div className="panel-icon"><Database size={21} /></div><div><h2>本机记录</h2><p>最近使用和收藏只存储在此设备的浏览器数据中。</p></div><div className="data-actions"><button type="button" className="secondary-button" disabled={!recentCount} onClick={onClearRecent}><Trash2 size={17} /> 清空最近使用 <small>{recentCount}</small></button><button type="button" className="secondary-button" disabled={!favoriteCount} onClick={onClearFavorites}><Trash2 size={17} /> 清空收藏 <small>{favoriteCount}</small></button></div></article>
       <article className="settings-panel ai-service-panel">
         <div className="panel-icon"><KeyRound size={21} /></div>
-        <div><h2>AI 服务</h2><p>仅用于你主动发起的 AI 去手写，图片会直接发送至配置的图像编辑接口。</p></div>
+        <div><h2>AI 服务</h2><p>仅用于你主动发起的 AI 图片处理，图片会直接发送至配置的图像编辑接口。</p></div>
         <div className="ai-service-form">
           <label><span>完整 API 地址</span><input value={aiConfig.endpoint} onChange={(event) => setAiConfig((current) => ({ ...current, endpoint: event.target.value }))} placeholder="https://example.com/v1/images/edits" autoComplete="url" /></label>
           <label><span>模型名</span><input value={aiConfig.model} onChange={(event) => setAiConfig((current) => ({ ...current, model: event.target.value }))} placeholder="你的图像编辑模型" autoComplete="off" /></label>

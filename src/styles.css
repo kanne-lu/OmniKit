@@ -421,6 +421,30 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
 .image-preview-caption { display: flex; min-height: 43px; align-items: center; gap: 7px; border-top: 1px solid #e4ecf2; padding: 0 14px; color: #728899; font-size: 11px; line-height: 1.45; }
 .image-preview-caption svg { flex: 0 0 auto; color: var(--blue); }
 
+.ai-image-workbench { grid-template-columns: minmax(320px, 380px) minmax(0, 1fr); }
+.ai-image-workbench .ai-config-note { margin-bottom: 1px; }
+.ai-background-control { display: grid; gap: 7px; }
+.ai-color-presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.ai-color-presets button, .ai-custom-color { display: flex; min-height: 36px; align-items: center; gap: 7px; border: 1px solid var(--line-strong); border-radius: 6px; background: #fbfdff; padding: 0 9px; color: #60788c; font-size: 11px; font-weight: 600; cursor: pointer; }
+.ai-color-presets button:hover:not(:disabled), .ai-custom-color:hover { border-color: #9fc2da; background: #f3f8fc; }
+.ai-color-presets button.is-selected { border-color: #82afd0; background: var(--blue-pale); color: #246aa7; }
+.ai-color-presets button i { width: 16px; height: 16px; flex: 0 0 auto; border: 1px solid rgb(30 52 70 / 18%); border-radius: 50%; box-shadow: inset 0 1px rgb(255 255 255 / 45%); }
+.ai-custom-color { position: relative; }
+.ai-custom-color input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.ai-custom-color::before { width: 16px; height: 16px; flex: 0 0 auto; border: 1px solid rgb(30 52 70 / 18%); border-radius: 50%; background: conic-gradient(#eb5757, #f2c94c, #27ae60, #2d9cdb, #9b51e0, #eb5757); content: ""; }
+.ai-custom-color:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.ai-color-value, .ai-dimension-note { color: #7c91a1; font-size: 10px; line-height: 1.45; }
+.ai-dimension-note { margin-top: 7px; }
+.ai-comparison-panel { display: grid; grid-template-rows: 42px minmax(0, 1fr) auto; }
+.ai-comparison-grid { display: grid; min-height: 505px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: #e4ecf2; }
+.ai-comparison-grid figure { display: grid; min-width: 0; min-height: 505px; grid-template-rows: 41px minmax(0, 1fr); margin: 0; background: #fbfdff; }
+.ai-comparison-grid figcaption { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #e4ecf2; padding: 0 12px; color: #60788c; font-size: 11px; font-weight: 700; }
+.ai-comparison-grid figcaption small { color: #8a9ba8; font-size: 10px; font-weight: 400; }
+.ai-image-stage { display: grid; min-width: 0; min-height: 0; place-items: center; overflow: hidden; background: #f7fafc; }
+.ai-image-stage.is-checkerboard { background-color: #f8fafc; background-image: linear-gradient(45deg, #e7edf2 25%, transparent 25%), linear-gradient(-45deg, #e7edf2 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e7edf2 75%), linear-gradient(-45deg, transparent 75%, #e7edf2 75%); background-position: 0 0, 0 8px, 8px -8px, -8px 0; background-size: 16px 16px; }
+.ai-image-stage > img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.ai-image-stage > .image-workbench-empty { width: 100%; min-height: 100%; }
+
 .image-queue-panel { display: grid; max-height: 670px; grid-template-rows: 42px minmax(0, 1fr) auto; }
 .image-queue-list { overflow: auto; scrollbar-color: #c5d7e2 transparent; scrollbar-width: thin; }
 .image-queue-row { display: grid; min-height: 62px; grid-template-columns: 28px minmax(0, 1fr) 22px 27px; align-items: center; gap: 8px; border-bottom: 1px solid #e7eef3; padding: 8px 10px 8px 12px; background: var(--surface); }
@@ -669,6 +693,9 @@ kbd { border: 1px solid #d7e2ea; border-radius: 4px; background: #f7fafc; paddin
   .image-preview-panel, .image-queue-panel { min-height: 0; }
   .image-preview-stage { min-height: 340px; padding: 12px; }
   .image-workbench-empty { min-height: 300px; }
+  .ai-comparison-grid { min-height: 0; grid-template-columns: 1fr; }
+  .ai-comparison-grid figure { min-height: 330px; }
+  .ai-image-stage { min-height: 288px; }
   .image-field-pair { grid-template-columns: 1fr; }
   .crop-ratio-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .crop-ratio-grid button { border-bottom: 1px solid #e1e9ef; }

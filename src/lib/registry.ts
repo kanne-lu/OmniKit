@@ -11,6 +11,10 @@ export type ToolId =
   | 'image-crop'
   | 'image-watermark'
   | 'image-stitch'
+  | 'id-photo-background'
+  | 'smart-cutout'
+  | 'old-photo-restoration'
+  | 'ai-upscale'
   | 'ocr'
   | 'copybook'
   | 'wordcount'
@@ -25,6 +29,10 @@ export type ToolIcon =
   | 'crop'
   | 'watermark'
   | 'stitch'
+  | 'id-photo'
+  | 'cutout'
+  | 'restore'
+  | 'upscale'
   | 'ocr'
   | 'copybook'
   | 'wordcount'
@@ -111,6 +119,38 @@ export const TOOL_REGISTRY: readonly ToolDefinition[] = [
     category: '图片工具',
     icon: 'stitch',
     keywords: ['图片', '长图', '拼接', '切图', '九宫格'],
+  },
+  {
+    id: 'id-photo-background',
+    name: '证件照换底色',
+    description: 'AI 提取人像后，在本地更换白、蓝、红或自定义纯色背景',
+    category: '图片工具',
+    icon: 'id-photo',
+    keywords: ['证件照', '换底色', '背景色', '人像', 'ai'],
+  },
+  {
+    id: 'smart-cutout',
+    name: '智能抠图',
+    description: '使用配置的 AI 服务提取主体并输出透明背景 PNG',
+    category: '图片工具',
+    icon: 'cutout',
+    keywords: ['抠图', '去背景', '透明背景', 'png', 'ai'],
+  },
+  {
+    id: 'old-photo-restoration',
+    name: '老照片修复',
+    description: '保守修复划痕、灰尘、褪色和轻微模糊，不强制上色',
+    category: '图片工具',
+    icon: 'restore',
+    keywords: ['老照片', '修复', '划痕', '降噪', 'ai'],
+  },
+  {
+    id: 'ai-upscale',
+    name: '图片放大增强',
+    description: '使用 AI 超分辨率将图片放大 2 倍或 4 倍',
+    category: '图片工具',
+    icon: 'upscale',
+    keywords: ['图片放大', '增强', '超分辨率', '2倍', '4倍', 'ai'],
   },
   {
     id: 'ocr',

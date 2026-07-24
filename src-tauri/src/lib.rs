@@ -2,8 +2,8 @@ mod image_jobs;
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine};
 use image::codecs::jpeg::JpegEncoder;
-use image::imageops::FilterType;
-use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader, RgbaImage};
+use image::imageops::{self, FilterType};
+use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader, Rgba, RgbaImage};
 use keyring::Entry;
 use md5::{Digest as Md5Digest, Md5};
 use reqwest::{redirect::Policy, Client, Url};
@@ -76,6 +76,48 @@ struct AiHandwritingPreview {
     height: u32,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+enum AiImageOperation {
+    Cutout,
+    Restore,
+    Upscale,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AiImageToolRequest {
+    input_path: String,
+    operation: AiImageOperation,
+    upscale_factor: Option<u8>,
+    config: AiServiceConfig,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveAiImageToolResultRequest {
+    preview_path: String,
+    input_path: String,
+    output_dir: String,
+    operation: AiImageOperation,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveAiBackgroundResultRequest {
+    preview_path: String,
+    input_path: String,
+    output_dir: String,
+    background_color: String,
+}
+
+#[derive(Clone, Copy)]
+enum AiPreviewRule {
+    Any,
+    Transparent,
+    Enlarged,
+}
+
 enum AiImageSource {
     Base64(String),
     Url(Url),
@@ -84,6 +126,42 @@ enum AiImageSource {
 const AI_SECRET_SERVICE: &str = "OmniKit";
 const AI_SECRET_ACCOUNT: &str = "ai-image-edit-api-key";
 const AI_HANDWRITING_PROMPT: &str = "Remove only existing handwritten annotations, notes, marks, and answers from this worksheet. Never solve questions or generate, infer, reconstruct, complete, correct, or add any answers, text, numbers, formulas, symbols, check marks, labels, or annotations, even when the correct answer appears obvious. Wherever handwriting is removed, restore only blank paper, original printed lines, table borders, or the unchanged background texture. Preserve every existing printed character, question, layout, table, line, illustration, margin, and paper background exactly. Do not rewrite, translate, sharpen, restyle, crop, or alter printed content. If uncertain whether content is printed or handwritten, leave it unchanged. Return one clean, faithful worksheet image only.";
+const MAX_AI_INPUT_BYTES: u64 = 20 * 1024 * 1024;
+const MAX_AI_INPUT_PIXELS: u64 = 30_000_000;
+const MAX_AI_RESULT_BYTES: usize = 50 * 1024 * 1024;
+const MAX_AI_RESULT_PIXELS: u64 = 60_000_000;
+
+impl AiImageOperation {
+    fn prompt(self, upscale_factor: Option<u8>) -> Result<String, String> {
+        match self {
+            Self::Cutout => Ok("Remove the entire background and return the original foreground subject on a fully transparent background. Preserve the subject, face, hair, clothing, edges, colors, proportions, and all foreground details exactly. Do not add shadows, borders, objects, text, or a replacement background. Return a PNG with a real alpha channel.".to_owned()),
+            Self::Restore => Ok("Restore this old photo conservatively. Reduce scratches, dust, noise, fading, and mild blur while preserving every person's identity, facial features, pose, composition, objects, text, and the original color character. Do not beautify faces, colorize a monochrome image, invent details, add objects, or restyle the photo. Return only the faithfully restored image.".to_owned()),
+            Self::Upscale => {
+                let factor = upscale_factor.unwrap_or(2);
+                if !matches!(factor, 2 | 4) {
+                    return Err("图片放大仅支持 2 倍或 4 倍".to_owned());
+                }
+                Ok(format!("Upscale this image by {factor}x using faithful super-resolution. Increase the actual pixel dimensions, improve natural detail and edge clarity, and reduce compression artifacts while preserving the exact composition, text, faces, colors, geometry, and content. Do not crop, restyle, hallucinate objects, or change aspect ratio. Return only the enhanced image."))
+            }
+        }
+    }
+
+    fn preview_rule(self) -> AiPreviewRule {
+        match self {
+            Self::Cutout => AiPreviewRule::Transparent,
+            Self::Restore => AiPreviewRule::Any,
+            Self::Upscale => AiPreviewRule::Enlarged,
+        }
+    }
+
+    fn output_label(self) -> &'static str {
+        match self {
+            Self::Cutout => "智能抠图",
+            Self::Restore => "老照片修复",
+            Self::Upscale => "图片放大增强",
+        }
+    }
+}
 
 fn ai_api_key_entry() -> Result<Entry, String> {
     Entry::new(AI_SECRET_SERVICE, AI_SECRET_ACCOUNT)
@@ -146,7 +224,7 @@ fn supported_ai_image_mime(path: &Path) -> Result<&'static str, String> {
         Some("jpg" | "jpeg") => Ok("image/jpeg"),
         Some("png") => Ok("image/png"),
         Some("webp") => Ok("image/webp"),
-        _ => Err("AI 去手写仅支持 JPG、PNG 或 WebP 图片".to_owned()),
+        _ => Err("AI 图片工具仅支持 JPG、PNG 或 WebP 图片".to_owned()),
     }
 }
 
@@ -196,7 +274,7 @@ fn temporary_ai_preview_path() -> PathBuf {
         .unwrap_or_default()
         .as_nanos();
     std::env::temp_dir().join(format!(
-        "omnikit-ai-handwriting-preview-{}-{timestamp}.png",
+        "omnikit-ai-image-preview-{}-{timestamp}.png",
         std::process::id()
     ))
 }
@@ -206,12 +284,54 @@ fn is_ai_preview_path(path: &Path) -> bool {
         && path
             .file_name()
             .and_then(|value| value.to_str())
-            .is_some_and(|value| value.starts_with("omnikit-ai-handwriting-preview-"))
+            .is_some_and(|value| {
+                value.starts_with("omnikit-ai-image-preview-")
+                    || value.starts_with("omnikit-ai-handwriting-preview-")
+            })
 }
 
-fn write_ai_preview(bytes: &[u8]) -> Result<AiHandwritingPreview, String> {
+fn validate_ai_preview_image(
+    image: &DynamicImage,
+    rule: AiPreviewRule,
+    source_dimensions: (u32, u32),
+) -> Result<(), String> {
+    let pixels = u64::from(image.width())
+        .checked_mul(u64::from(image.height()))
+        .ok_or_else(|| "AI 结果尺寸过大".to_owned())?;
+    if pixels == 0 || pixels > MAX_AI_RESULT_PIXELS {
+        return Err("AI 结果尺寸过大，无法安全生成预览".to_owned());
+    }
+    match rule {
+        AiPreviewRule::Any => Ok(()),
+        AiPreviewRule::Transparent => {
+            let rgba = image.to_rgba8();
+            let has_transparency = rgba.pixels().any(|pixel| pixel.0[3] < 255);
+            let has_foreground = rgba.pixels().any(|pixel| pixel.0[3] > 0);
+            if !has_transparency || !has_foreground {
+                return Err("AI 服务未返回带透明通道的有效抠图 PNG，请更换支持透明背景的模型。".to_owned());
+            }
+            Ok(())
+        }
+        AiPreviewRule::Enlarged => {
+            if image.width() <= source_dimensions.0 || image.height() <= source_dimensions.1 {
+                return Err("AI 服务返回的图片尺寸没有增大，请更换支持超分辨率的模型。".to_owned());
+            }
+            Ok(())
+        }
+    }
+}
+
+fn write_ai_preview(
+    bytes: &[u8],
+    rule: AiPreviewRule,
+    source_dimensions: (u32, u32),
+) -> Result<AiHandwritingPreview, String> {
+    if bytes.len() > MAX_AI_RESULT_BYTES {
+        return Err("AI 服务返回的图片文件过大".to_owned());
+    }
     let image = image::load_from_memory(bytes)
         .map_err(|_| "AI 服务返回的内容不是可用图片".to_owned())?;
+    validate_ai_preview_image(&image, rule, source_dimensions)?;
     let preview_path = temporary_ai_preview_path();
     image
         .save_with_format(&preview_path, ImageFormat::Png)
@@ -226,23 +346,37 @@ fn write_ai_preview(bytes: &[u8]) -> Result<AiHandwritingPreview, String> {
     })
 }
 
-async fn request_ai_handwriting_preview(
+async fn request_ai_image_preview(
     input_path: String,
     config: AiServiceConfig,
+    prompt: String,
+    rule: AiPreviewRule,
 ) -> Result<AiHandwritingPreview, String> {
     let endpoint = validate_ai_service_config(&config)?;
     let api_key = read_ai_api_key()?;
     let source = PathBuf::from(&input_path);
     let mime = supported_ai_image_mime(&source)?;
-    let source_bytes = fs::read(&source).map_err(|error| format!("无法读取图片：{error}"))?;
-    ImageReader::open(&source)
+    let source_metadata = fs::metadata(&source).map_err(|error| format!("无法读取图片：{error}"))?;
+    if source_metadata.len() > MAX_AI_INPUT_BYTES {
+        return Err("图片文件超过 20 MB，无法发送至 AI 服务".to_owned());
+    }
+    let source_image = ImageReader::open(&source)
         .map_err(|error| format!("无法打开图片：{error}"))?
         .decode()
         .map_err(|error| format!("无法读取图片：{error}"))?;
+    let source_dimensions = source_image.dimensions();
+    let source_pixels = u64::from(source_dimensions.0)
+        .checked_mul(u64::from(source_dimensions.1))
+        .ok_or_else(|| "图片尺寸过大".to_owned())?;
+    if source_pixels == 0 || source_pixels > MAX_AI_INPUT_PIXELS {
+        return Err("图片像素超过 AI 工具允许范围".to_owned());
+    }
+    drop(source_image);
+    let source_bytes = fs::read(&source).map_err(|error| format!("无法读取图片：{error}"))?;
     let filename = source
         .file_name()
         .and_then(|value| value.to_str())
-        .unwrap_or("worksheet")
+        .unwrap_or("image")
         .to_owned();
     let image_part = reqwest::multipart::Part::bytes(source_bytes)
         .file_name(filename)
@@ -250,7 +384,7 @@ async fn request_ai_handwriting_preview(
         .map_err(|error| format!("无法准备 AI 图片请求：{error}"))?;
     let form = reqwest::multipart::Form::new()
         .text("model", config.model.trim().to_owned())
-        .text("prompt", AI_HANDWRITING_PROMPT)
+        .text("prompt", prompt)
         .part("image", image_part);
     let client = ai_http_client()?;
     let request = client
@@ -271,7 +405,9 @@ async fn request_ai_handwriting_preview(
         .json::<Value>()
         .await
         .map_err(|_| "AI 服务返回格式不兼容：无法读取结果。".to_owned())?;
-    let image_bytes = match extract_ai_image_source(&payload)? {
+    let image_source = extract_ai_image_source(&payload)?;
+    drop(payload);
+    let image_bytes = match image_source {
         AiImageSource::Base64(value) => BASE64_STANDARD
             .decode(value.trim())
             .map_err(|_| "AI 服务返回的图片内容无效".to_owned())?,
@@ -284,6 +420,12 @@ async fn request_ai_handwriting_preview(
             if !response.status().is_success() {
                 return Err("无法下载 AI 返回的图片结果。".to_owned());
             }
+            if response
+                .content_length()
+                .is_some_and(|length| length > MAX_AI_RESULT_BYTES as u64)
+            {
+                return Err("AI 服务返回的图片文件过大".to_owned());
+            }
             response
                 .bytes()
                 .await
@@ -291,16 +433,68 @@ async fn request_ai_handwriting_preview(
                 .to_vec()
         }
     };
-    write_ai_preview(&image_bytes)
+    tauri::async_runtime::spawn_blocking(move || {
+        write_ai_preview(&image_bytes, rule, source_dimensions)
+    })
+    .await
+    .map_err(|error| format!("AI 图片预览任务异常终止：{error}"))?
 }
 
+async fn request_ai_handwriting_preview(
+    input_path: String,
+    config: AiServiceConfig,
+) -> Result<AiHandwritingPreview, String> {
+    request_ai_image_preview(
+        input_path,
+        config,
+        AI_HANDWRITING_PROMPT.to_owned(),
+        AiPreviewRule::Any,
+    )
+    .await
+}
+
+#[cfg(test)]
 fn build_ai_output_path(input_path: &Path, output_dir: &Path) -> PathBuf {
+    build_labeled_ai_output_path(input_path, output_dir, "AI去手写", 1)
+}
+
+fn build_labeled_ai_output_path(
+    input_path: &Path,
+    output_dir: &Path,
+    label: &str,
+    sequence: u32,
+) -> PathBuf {
     let stem = input_path
         .file_stem()
         .and_then(|value| value.to_str())
         .filter(|value| !value.trim().is_empty())
-        .unwrap_or("worksheet");
-    output_dir.join(format!("{stem}-AI去手写.png"))
+        .unwrap_or("image");
+    if sequence <= 1 {
+        output_dir.join(format!("{stem}-{label}.png"))
+    } else {
+        output_dir.join(format!("{stem}-{label}-{sequence}.png"))
+    }
+}
+
+fn available_ai_output_path(input_path: &Path, output_dir: &Path, label: &str) -> PathBuf {
+    for sequence in 1..=10_000 {
+        let candidate = build_labeled_ai_output_path(input_path, output_dir, label, sequence);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    build_labeled_ai_output_path(input_path, output_dir, label, u32::MAX)
+}
+
+fn parse_hex_color(value: &str) -> Result<Rgba<u8>, String> {
+    let value = value.trim().trim_start_matches('#');
+    if value.len() != 6 || !value.chars().all(|character| character.is_ascii_hexdigit()) {
+        return Err("背景颜色必须是 #RRGGBB 格式".to_owned());
+    }
+    let red = u8::from_str_radix(&value[0..2], 16).map_err(|_| "背景颜色格式无效".to_owned())?;
+    let green = u8::from_str_radix(&value[2..4], 16).map_err(|_| "背景颜色格式无效".to_owned())?;
+    let blue = u8::from_str_radix(&value[4..6], 16).map_err(|_| "背景颜色格式无效".to_owned())?;
+    Ok(Rgba([red, green, blue, 255]))
 }
 
 fn hash_file_contents(path: &Path) -> Result<HashResult, String> {
@@ -652,6 +846,32 @@ async fn preview_ai_handwriting_removal(
 }
 
 #[tauri::command]
+async fn preview_ai_image_tool(
+    request: AiImageToolRequest,
+) -> Result<AiHandwritingPreview, String> {
+    let prompt = request.operation.prompt(request.upscale_factor)?;
+    request_ai_image_preview(
+        request.input_path,
+        request.config,
+        prompt,
+        request.operation.preview_rule(),
+    )
+    .await
+}
+
+#[tauri::command]
+fn remove_ai_image_preview(preview_path: String) -> Result<(), String> {
+    let preview_path = PathBuf::from(preview_path);
+    if !is_ai_preview_path(&preview_path) {
+        return Err("只能清理 OmniKit 创建的 AI 临时预览".to_owned());
+    }
+    if !preview_path.exists() {
+        return Ok(());
+    }
+    fs::remove_file(preview_path).map_err(|error| format!("无法清理 AI 临时预览：{error}"))
+}
+
+#[tauri::command]
 fn save_ai_handwriting_result(
     preview_path: String,
     input_path: String,
@@ -665,10 +885,7 @@ fn save_ai_handwriting_result(
     if !output_dir.is_dir() {
         return Err("请选择有效的输出文件夹".to_owned());
     }
-    let output_path = build_ai_output_path(Path::new(&input_path), &output_dir);
-    if output_path.exists() {
-        return Err("输出文件已存在，请更换输出文件夹或先移动旧文件。".to_owned());
-    }
+    let output_path = available_ai_output_path(Path::new(&input_path), &output_dir, "AI去手写");
     let image = ImageReader::open(&preview_path)
         .map_err(|error| format!("无法读取 AI 结果预览：{error}"))?
         .decode()
@@ -685,6 +902,94 @@ fn save_ai_handwriting_result(
         width: image.width(),
         height: image.height(),
     })
+}
+
+fn load_ai_preview(preview_path: &str) -> Result<(PathBuf, DynamicImage), String> {
+    let preview_path = PathBuf::from(preview_path);
+    if !is_ai_preview_path(&preview_path) || !preview_path.is_file() {
+        return Err("AI 结果预览已失效，请重新处理图片。".to_owned());
+    }
+    let image = ImageReader::open(&preview_path)
+        .map_err(|error| format!("无法读取 AI 结果预览：{error}"))?
+        .decode()
+        .map_err(|error| format!("无法读取 AI 结果预览：{error}"))?;
+    Ok((preview_path, image))
+}
+
+fn validate_ai_output_dir(output_dir: &str) -> Result<PathBuf, String> {
+    let output_dir = PathBuf::from(output_dir);
+    if !output_dir.is_dir() {
+        return Err("请选择有效的输出文件夹".to_owned());
+    }
+    Ok(output_dir)
+}
+
+fn save_ai_png(image: &DynamicImage, output_path: &Path, label: &str) -> Result<ImageResult, String> {
+    image
+        .save_with_format(output_path, ImageFormat::Png)
+        .map_err(|error| format!("无法保存{label}结果：{error}"))?;
+    let metadata = fs::metadata(output_path).map_err(|error| format!("无法读取输出文件：{error}"))?;
+    Ok(ImageResult {
+        output_path: output_path.to_string_lossy().to_string(),
+        bytes: metadata.len(),
+        width: image.width(),
+        height: image.height(),
+    })
+}
+
+#[tauri::command]
+async fn save_ai_image_tool_result(
+    request: SaveAiImageToolResultRequest,
+) -> Result<ImageResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (_, image) = load_ai_preview(&request.preview_path)?;
+        let source_dimensions = if request.operation == AiImageOperation::Upscale {
+            ImageReader::open(&request.input_path)
+                .map_err(|error| format!("无法读取原图：{error}"))?
+                .into_dimensions()
+                .map_err(|error| format!("无法读取原图尺寸：{error}"))?
+        } else {
+            (image.width(), image.height())
+        };
+        validate_ai_preview_image(&image, request.operation.preview_rule(), source_dimensions)?;
+        let output_dir = validate_ai_output_dir(&request.output_dir)?;
+        let label = request.operation.output_label();
+        let output_path = available_ai_output_path(Path::new(&request.input_path), &output_dir, label);
+        save_ai_png(&image, &output_path, label)
+    })
+    .await
+    .map_err(|error| format!("AI 图片保存任务异常终止：{error}"))?
+}
+
+#[tauri::command]
+async fn save_ai_background_result(
+    request: SaveAiBackgroundResultRequest,
+) -> Result<ImageResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (_, image) = load_ai_preview(&request.preview_path)?;
+        validate_ai_preview_image(
+            &image,
+            AiPreviewRule::Transparent,
+            image.dimensions(),
+        )?;
+        let color = parse_hex_color(&request.background_color)?;
+        let foreground = image.to_rgba8();
+        let mut background = RgbaImage::from_pixel(image.width(), image.height(), color);
+        imageops::overlay(&mut background, &foreground, 0, 0);
+        let output_dir = validate_ai_output_dir(&request.output_dir)?;
+        let output_path = available_ai_output_path(
+            Path::new(&request.input_path),
+            &output_dir,
+            "证件照换底色",
+        );
+        save_ai_png(
+            &DynamicImage::ImageRgba8(background),
+            &output_path,
+            "证件照换底色",
+        )
+    })
+    .await
+    .map_err(|error| format!("证件照保存任务异常终止：{error}"))?
 }
 
 #[tauri::command]
@@ -853,6 +1158,10 @@ pub fn run() {
             delete_ai_api_key,
             preview_ai_handwriting_removal,
             save_ai_handwriting_result,
+            preview_ai_image_tool,
+            remove_ai_image_preview,
+            save_ai_image_tool_result,
+            save_ai_background_result,
             preview_rename,
             copy_renamed_files,
             convert_image,
@@ -874,11 +1183,14 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_ai_output_path, describe_ai_http_error, expected_rgba_bytes, extract_ai_image_source,
-        ocr_preprocess_dimensions, reconstruct_ocr_line, supported_ai_image_mime,
-        validate_ai_service_config, winrt_storage_path, AiImageSource, AiServiceConfig,
+        available_ai_output_path, build_ai_output_path, describe_ai_http_error,
+        expected_rgba_bytes, extract_ai_image_source, ocr_preprocess_dimensions,
+        parse_hex_color, reconstruct_ocr_line, supported_ai_image_mime,
+        validate_ai_preview_image, validate_ai_service_config, winrt_storage_path,
+        AiImageOperation, AiImageSource, AiPreviewRule, AiServiceConfig,
     };
-    use std::path::Path;
+    use image::{DynamicImage, Rgba, RgbaImage};
+    use std::{fs, path::Path};
 
     #[test]
     fn removes_extended_windows_path_prefix_before_calling_winrt() {
@@ -975,6 +1287,55 @@ mod tests {
         assert_eq!(
             build_ai_output_path(Path::new(r"C:\\input\\试卷.jpg"), Path::new(r"D:\\output")),
             Path::new(r"D:\\output\\试卷-AI去手写.png")
+        );
+    }
+
+    #[test]
+    fn builds_upscale_prompts_for_supported_factors_only() {
+        assert!(AiImageOperation::Upscale.prompt(Some(2)).unwrap().contains("2x"));
+        assert!(AiImageOperation::Upscale.prompt(Some(4)).unwrap().contains("4x"));
+        assert!(AiImageOperation::Upscale.prompt(Some(3)).is_err());
+    }
+
+    #[test]
+    fn validates_cutout_transparency_and_foreground() {
+        let valid = DynamicImage::ImageRgba8(RgbaImage::from_fn(2, 1, |x, _| {
+            if x == 0 { Rgba([20, 30, 40, 255]) } else { Rgba([0, 0, 0, 0]) }
+        }));
+        let opaque = DynamicImage::ImageRgba8(RgbaImage::from_pixel(2, 1, Rgba([20, 30, 40, 255])));
+        let empty = DynamicImage::ImageRgba8(RgbaImage::from_pixel(2, 1, Rgba([0, 0, 0, 0])));
+
+        assert!(validate_ai_preview_image(&valid, AiPreviewRule::Transparent, (2, 1)).is_ok());
+        assert!(validate_ai_preview_image(&opaque, AiPreviewRule::Transparent, (2, 1)).is_err());
+        assert!(validate_ai_preview_image(&empty, AiPreviewRule::Transparent, (2, 1)).is_err());
+    }
+
+    #[test]
+    fn requires_upscale_results_to_increase_both_dimensions() {
+        let enlarged = DynamicImage::new_rgba8(200, 120);
+        let same_width = DynamicImage::new_rgba8(100, 120);
+
+        assert!(validate_ai_preview_image(&enlarged, AiPreviewRule::Enlarged, (100, 60)).is_ok());
+        assert!(validate_ai_preview_image(&same_width, AiPreviewRule::Enlarged, (100, 60)).is_err());
+    }
+
+    #[test]
+    fn parses_six_digit_hex_background_colors() {
+        assert_eq!(parse_hex_color("#1A7FE2"), Ok(Rgba([26, 127, 226, 255])));
+        assert_eq!(parse_hex_color("ffffff"), Ok(Rgba([255, 255, 255, 255])));
+        assert!(parse_hex_color("#fff").is_err());
+        assert!(parse_hex_color("#zzzzzz").is_err());
+    }
+
+    #[test]
+    fn chooses_the_next_available_ai_output_name() {
+        let output = tempfile::tempdir().unwrap();
+        let input = Path::new("portrait.jpg");
+        fs::write(output.path().join("portrait-智能抠图.png"), b"occupied").unwrap();
+
+        assert_eq!(
+            available_ai_output_path(input, output.path(), "智能抠图"),
+            output.path().join("portrait-智能抠图-2.png")
         );
     }
 

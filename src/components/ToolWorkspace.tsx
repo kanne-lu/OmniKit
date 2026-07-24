@@ -6,6 +6,7 @@ import { CodecTool } from './CodecTool';
 import { AiHandwritingRemovalTool, CopybookTool, WordCountTool } from './EducationTools';
 import { HashTool, RenameTool } from './FileTools';
 import { BatchImageTool, ImageCropTool, ImageStitchTool, ImageWatermarkTool } from './ImageTools';
+import { AiUpscaleTool, IdPhotoBackgroundTool, OldPhotoRestorationTool, SmartCutoutTool } from './AiImageTools';
 import { JsonTool } from './JsonTool';
 import { OcrTool } from './OcrTool';
 
@@ -48,6 +49,10 @@ export function ToolWorkspace({
     'image-crop': <ImageCropTool />,
     'image-watermark': <ImageWatermarkTool />,
     'image-stitch': <ImageStitchTool />,
+    'id-photo-background': <IdPhotoBackgroundTool />,
+    'smart-cutout': <SmartCutoutTool />,
+    'old-photo-restoration': <OldPhotoRestorationTool />,
+    'ai-upscale': <AiUpscaleTool />,
     ocr: <OcrTool />,
     copybook: <CopybookTool />,
     wordcount: <WordCountTool />,
