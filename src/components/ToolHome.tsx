@@ -9,20 +9,24 @@ interface ToolHomeProps {
   tools: ToolDefinition[];
   recent: ToolId[];
   favorites: ToolId[];
+  homeMascotVideoSrc?: string;
+  emptyStateMascotVideoSrc?: string;
+  reducedMotion: boolean;
   onOpenTool: (id: ToolId) => void;
   onToggleFavorite: (id: ToolId) => void;
 }
 
-export function ToolHome({ title, description, emptyMessage, tools, recent, favorites, onOpenTool, onToggleFavorite }: ToolHomeProps) {
+export function ToolHome({ title, description, emptyMessage, tools, recent, favorites, homeMascotVideoSrc, emptyStateMascotVideoSrc, reducedMotion, onOpenTool, onToggleFavorite }: ToolHomeProps) {
   const visibleRecents = recent.map((id) => TOOL_BY_ID.get(id)).filter((tool): tool is ToolDefinition => Boolean(tool)).slice(0, 7);
   return (
     <section className="home-view">
-      <header className="home-header">
-        <div>
+      <header className={homeMascotVideoSrc ? 'home-header has-mascot-video' : 'home-header'}>
+        <div className="home-hero-copy">
           <span className="section-kicker">OMNIKIT · 本地工具箱</span>
           <h1>{title}</h1>
           <p>{description}</p>
         </div>
+        {homeMascotVideoSrc && <video className="home-mascot-video" src={homeMascotVideoSrc} autoPlay={!reducedMotion} loop muted playsInline preload="metadata" disablePictureInPicture controlsList="nodownload noremoteplayback" aria-hidden="true" tabIndex={-1} draggable={false} onContextMenu={(event) => event.preventDefault()} />}
         <div className="local-status" aria-label="本机处理状态">
           <span className="status-dot" />
           <div><strong>本机处理</strong><small>数据不离开设备</small></div>
@@ -55,7 +59,10 @@ export function ToolHome({ title, description, emptyMessage, tools, recent, favo
               </article>
             );
           })}
-          {!tools.length && <div className="empty-state"><strong>{emptyMessage}</strong><span>试试更换分类，或清除搜索条件。</span></div>}
+          {!tools.length && <div className={emptyStateMascotVideoSrc ? 'empty-state has-mascot-video' : 'empty-state'}>
+            {emptyStateMascotVideoSrc && <video className="empty-state-mascot-video" src={emptyStateMascotVideoSrc} autoPlay={!reducedMotion} loop muted playsInline preload="metadata" disablePictureInPicture controlsList="nodownload noremoteplayback" aria-hidden="true" tabIndex={-1} draggable={false} onContextMenu={(event) => event.preventDefault()} />}
+            <div className="empty-state-copy"><strong>{emptyMessage}</strong><span>试试更换分类，或清除搜索条件。</span></div>
+          </div>}
           </div>
           <p className="privacy-note"><ShieldCheck size={19} /> 所有文本与文件仅在本机处理</p>
         </section>

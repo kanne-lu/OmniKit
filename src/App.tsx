@@ -4,6 +4,8 @@ import { Sidebar, type AppView } from './components/Sidebar';
 import { ToolHome } from './components/ToolHome';
 import { ToolWorkspace } from './components/ToolWorkspace';
 import { Topbar } from './components/Topbar';
+import mainMascotVideo from './assets/omnikit-mascot-main.mp4';
+import pageMascotVideo from './assets/omnikit-mascot-pages.mp4';
 import {
   appendClipboardText,
   clearUnpinnedClipboardEntries,
@@ -48,6 +50,10 @@ export default function App() {
     return matchingTools;
   }, [activeCategory, activeView, favoriteTools, query, recentTools]);
   const activeTool = activeToolId ? TOOL_BY_ID.get(activeToolId) : undefined;
+  const homeMascotVideo = !activeTool && activeView === 'home' && activeCategory === 'all' && !query.trim() ? mainMascotVideo : undefined;
+  const emptyStateMascotVideo = !activeTool && !query.trim() && (
+    activeView === 'recent' && recent.length === 0 || activeView === 'favorites' && favorites.length === 0
+  ) ? pageMascotVideo : undefined;
 
   useEffect(() => { localStorage.setItem(`${STORAGE_PREFIX}recent`, JSON.stringify(recent)); }, [recent]);
   useEffect(() => { localStorage.setItem(`${STORAGE_PREFIX}favorites`, JSON.stringify(favorites)); }, [favorites]);
@@ -119,7 +125,7 @@ export default function App() {
             onClipboardPinToggle={(id) => setClipboardEntries((current) => toggleClipboardPin(current, id))}
             onClipboardClear={() => setClipboardEntries((current) => clearUnpinnedClipboardEntries(current))}
             onClipboardCopied={(text) => setClipboardEntries((current) => appendClipboardText(current, text, Date.now()))}
-          /> : activeView === 'settings' ? <SettingsPanel recentCount={recent.length} favoriteCount={favorites.length} reducedMotion={reducedMotion} onReducedMotionChange={setReducedMotion} onClearRecent={() => setRecent([])} onClearFavorites={() => setFavorites([])} /> : activeView === 'about' ? <AboutPanel /> : <ToolHome {...screenCopy} tools={visibleTools} recent={recent} favorites={favorites} onOpenTool={openTool} onToggleFavorite={toggleFavorite} />}
+          /> : activeView === 'settings' ? <SettingsPanel recentCount={recent.length} favoriteCount={favorites.length} reducedMotion={reducedMotion} onReducedMotionChange={setReducedMotion} onClearRecent={() => setRecent([])} onClearFavorites={() => setFavorites([])} /> : activeView === 'about' ? <AboutPanel mascotVideoSrc={pageMascotVideo} reducedMotion={reducedMotion} /> : <ToolHome {...screenCopy} tools={visibleTools} recent={recent} favorites={favorites} homeMascotVideoSrc={homeMascotVideo} emptyStateMascotVideoSrc={emptyStateMascotVideo} reducedMotion={reducedMotion} onOpenTool={openTool} onToggleFavorite={toggleFavorite} />}
         </div>
       </main>
     </div>

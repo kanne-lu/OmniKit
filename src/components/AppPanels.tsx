@@ -152,7 +152,12 @@ export function UpdatePanel() {
   </section>;
 }
 
-export function AboutPanel() {
+interface AboutPanelProps {
+  mascotVideoSrc: string;
+  reducedMotion: boolean;
+}
+
+export function AboutPanel({ mascotVideoSrc, reducedMotion }: AboutPanelProps) {
   return <section className="info-view about-view" aria-labelledby="about-title">
     <header className="info-heading"><span className="section-kicker">OMNIKIT</span><h1 id="about-title">关于</h1><p>为日常处理任务准备的本地工具箱。</p></header>
     <div className="about-layout">
@@ -176,6 +181,7 @@ export function AboutPanel() {
       </article>
       <aside className="about-aside" aria-label="OmniKit 简介">
         <span className="section-kicker">为什么是 OmniKit</span>
+        <video className="about-mascot-video" src={mascotVideoSrc} autoPlay={!reducedMotion} loop muted playsInline preload="metadata" disablePictureInPicture controlsList="nodownload noremoteplayback" aria-hidden="true" tabIndex={-1} draggable={false} onContextMenu={(event) => event.preventDefault()} />
         <h2>少一点切换，多一点专注。</h2>
         <p className="about-aside-summary">把日常会反复遇到的处理需求留在一个轻量、清晰的桌面应用中。</p>
         <ol className="about-principles"><li><span>01</span><div><strong>常用工具集中</strong><p>从格式化文本到处理图片，随时打开即可使用。</p></div></li><li><span>02</span><div><strong>本地处理为先</strong><p>内容留在设备中，让隐私和结果都更安心。</p></div></li><li><span>03</span><div><strong>体验保持简单</strong><p>专注完成任务，不用学习复杂的工作流程。</p></div></li></ol>
